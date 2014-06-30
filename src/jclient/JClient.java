@@ -194,6 +194,13 @@ public class JClient {
 		return (ReturnValue) callMasterFunction(parameters);
 	}
 	
+	public ReturnValue scanQuery(QueryConfig config[]) {
+		
+		parameters.function_type = Param.FUNCTION_TYPE.scanQuery;
+		parameters.qconfig = config;
+		return (ReturnValue) callMasterFunction(parameters);
+	}
+	
 	public String getData(long index) {
 		
 		parameters.function_type = Param.FUNCTION_TYPE.getData;

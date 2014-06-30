@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.lang.String;
 
 import javax.management.MBeanServer;
 
@@ -109,6 +110,9 @@ public class FunctionHandler implements ServerInvocationHandler {
 		if(parameter.function_type == Param.FUNCTION_TYPE.answerStringQuery) 
 			return this.answerStringQuery(parameter.qconfig);
 		
+		if(parameter.function_type == Param.FUNCTION_TYPE.scanQuery)
+			return this.scanQuery(parameter.qconfig);
+		
 		if(parameter.function_type == Param.FUNCTION_TYPE.getData)
 			return this.getData(parameter.param_long_elementID);
 		
@@ -154,10 +158,10 @@ public class FunctionHandler implements ServerInvocationHandler {
 		try {
 			BufferedReader buf = new BufferedReader(new InputStreamReader(new FileInputStream(ipfile)));
 			String line = "";
-			while ((line = buf.readLine()) != null) {
+			while ((line = buf.readLine()) != null && !line.trim().equals("")) {
 				invokerlocator = new InvokerLocator(line);
 				machines.add(new Client(invokerlocator));
-				System.out.println(line);
+				System.out.println(line); 
 			}
 			System.out.println("machine num "+machines.size());
 		} catch (Exception e) {
@@ -443,7 +447,26 @@ public class FunctionHandler implements ServerInvocationHandler {
 	}
 	
 	
-	
+	/**
+	 * scan the vectors
+	 * master node collects the local topK results from slave nodes
+	 * then select the global TopK
+	 */
+	public ReturnValue scanQuery(QueryConfig qconfigs[]) {
+
+		long[] index = new long[qconfigs[0].getK()];
+		ReturnValue revalue = new ReturnValue();
+		try {
+			revalue = this.getReturnValueByScanningNode(qconfigs);
+		} catch (Throwable e) {
+			
+			System.out.println(Messager.SCAN_FAIL);
+			if(debug)
+			// TODO Auto-generated catch block
+				e.printStackTrace();
+		}
+		return revalue;
+	}
 	
 	
 	/**
@@ -460,6 +483,70 @@ public class FunctionHandler implements ServerInvocationHandler {
 		// set sub system
 		for(int i = 0; i < machines.size(); i++)
 			machines.elementAt(i).setSubsystem("Query");
+		//create a thread pool for queries
+		ExecutorService executor = Executors.newFixedThreadPool(fixed_thread_num);
+		
+		List<QueryConfig> list = new ArrayList<QueryConfig>();	
+		for(int i = 0;i < qconfigs.length; i++)
+			list.add(qconfigs[i]);
+		// for vector search, we need to
+		if(qconfigs[0].getType() == Index.VECTOR_SEARCH) {
+			//sort the query configs by their dimension 
+			//O(n)
+			for(int i = 0;i < qconfigs.length; i++)
+				list.set(qconfigs[i].getDim(), qconfigs[i]);
+		}
+		Vector<Future<ReturnValue>> future_vec = new Vector<Future<ReturnValue>>();
+		int num_of_tasks = 0;
+		// submit the task to threadpool
+		for(int i = 0; i < machines.size(); i++) {
+			num_of_tasks++;
+			Future<ReturnValue> future = executor.submit(
+					new NodeTask(machines.elementAt(i), list));
+			future_vec.add(future);
+		}
+		
+		long start = System.currentTimeMillis();
+		long merge_time = 0;
+		// wait for all the tasks are done
+		int num_of_returned = 0;
+		while(num_of_returned < num_of_tasks) {
+			Thread.sleep(SLEEP_TIME);
+			for(int i = 0; i < future_vec.size(); i++) {
+				if(future_vec.elementAt(i) != null && future_vec.elementAt(i).isDone()) {
+					num_of_returned++;
+					ReturnValue revalue = future_vec.elementAt(i).get();
+					System.out.println("node "+i+" finish time "+(System.currentTimeMillis()-start)+" ms");
+					// merge the results from different nodes
+					long merge_start = System.currentTimeMillis();
+					result.merge(revalue);
+					merge_time += System.currentTimeMillis() - merge_start;
+					// clear the task
+					future_vec.setElementAt(null, i);
+				}
+			}
+		}
+		System.out.println("Merge time in function:\t"+merge_time+" ms");
+		System.out.println("Wait for return:\t"+(System.currentTimeMillis() - start - merge_time+" ms"));
+		executor.shutdown();
+		return result;
+	}
+	
+	
+	/**
+	 * distribute the query task and search in parallel
+	 * one task defined as all the queries on one slave node
+	 * when the number of slave nodes is small, we can decrease 
+	 * the cost on remote function calling
+	 * */
+	private ReturnValue getReturnValueByScanningNode(QueryConfig qconfigs[]) throws Throwable {
+		
+		// final result
+		ReturnValue result = new ReturnValue();
+		
+		// set sub system
+		for(int i = 0; i < machines.size(); i++)
+			machines.elementAt(i).setSubsystem("Scan");
 		//create a thread pool for queries
 		ExecutorService executor = Executors.newFixedThreadPool(fixed_thread_num);
 		

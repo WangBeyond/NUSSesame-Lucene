@@ -150,7 +150,7 @@ public class Client {
 	}
 	
 	//randomly pick 5% of the original data in order to get a bound
-	int scan_topK_search() throws Throwable {
+	int scan_topK_searchLocally() throws Throwable {
 		
 		BufferedReader buf = new BufferedReader(new InputStreamReader(new FileInputStream("data/query.txt")));
 		String line = "";
@@ -173,24 +173,21 @@ public class Client {
 			}
 			int picked = 0, index = 0;
 			Random r = new Random();
-			//randomly pick 5% of the data
-			while(picked < vec_num/20) {
-				index++;
+
+			while(picked < vec_num) {
 				int vec[] = reader.getFeature(128);
-				//30% to pick current data
-				if(r.nextInt(30) < 10) {
-					picked++;
-					distance = 0;					
-					for(int j = 0; j < 128; j++){
-						distance += ((query[j] - vec[j]) * (query[j] - vec[j]));
-					}
-					if(pq.size() < topK) 
-						pq.add(new Combo(distance, index));
-					else if(distance < pq.peek().distance) {
-						pq.poll();
-						pq.add(new Combo(distance, index));
-					}
+				picked++;
+				distance = 0;					
+				for(int j = 0; j < 128; j++){
+					distance += ((query[j] - vec[j]) * (query[j] - vec[j]));
 				}
+				if(pq.size() < topK) 
+					pq.add(new Combo(distance, index));
+				else if(distance < pq.peek().distance) {
+					pq.poll();
+					pq.add(new Combo(distance, index));
+				}
+				index++;
 			}
 		}
 		System.out.println("avg time:\t"+(System.currentTimeMillis() - start));
@@ -200,6 +197,58 @@ public class Client {
 			System.out.println(combo.index+"\t"+combo.distance);
 		}
 		return dis;
+	}
+	
+	int scan_topK_search() throws Throwable {
+		jclient.connectAllServers(vec_index);
+
+		BufferedReader buf = new BufferedReader(new InputStreamReader(new FileInputStream("data/query.txt")));
+		String line = "";	
+		K = 5;
+		int qid = 0;
+		int distance = -1;
+		long averTime = 0;
+		while((line = buf.readLine()) != null) {
+			qid++;
+			String values[] = line.split(" ");
+			//maximum number of range and value
+			int dim_range= 128 / COMBINE_DIM;
+			long value_range = 255;
+			SIFTConfig config[] = new SIFTConfig[dim_range];
+			for(int i = 0; i < dim_range; i++) {
+				//initialize a query configuration, set query id
+				config[i] = new SIFTConfig(qid);
+				//set the domain
+				config[i].setDimValueRange(dim_range, value_range);
+				//Does not support dimension combination
+				int combine_values[] = new int[1];
+				combine_values[0] = Integer.valueOf(values[i]);
+				//set query
+				config[i].setQuerylong(i, combine_values);
+				//set bi-direction search range
+				config[i].setRange(10, 10);		
+				//set top K
+				config[i].setK(K);
+			}
+			jclient.initAllServers(Index.VECTOR_SCAN, vec_index);
+			System.out.println("scanning...");
+			long startTime = System.currentTimeMillis();
+			ReturnValue revalue = jclient.scanQuery(config);
+			long endTime = System.currentTimeMillis();
+			averTime += (endTime - startTime);
+			for(int i = 0; i < K; i++) {
+				List<Map.Entry<Long, float[]>>list = revalue.sortedOndis();
+				if(i == 0){
+					distance = Math.round(list.get(0).getValue()[1]);
+				}
+				System.out.println(list.get(i).getKey()+"\t"+list.get(i).getValue()[1]);
+			}
+			System.out.println("scanning time: "+(endTime-startTime)+" ms");
+		}
+
+		System.out.println("avg time:\t"+averTime/qid);
+
+		return distance;
 	}
 	
 	public static void main(String args[]) throws Throwable {
@@ -235,9 +284,9 @@ class SIFTConfig extends QueryConfig {
 	@Override
 	public float calcDistance(long a, long b) {
 		// TODO Auto-generated method stub
-		//return (a - b) * (a - b);
+		return (a - b) * (a - b);
 		//L1
-		return a - b;
+		//return Math.abs(a - b);
 	}
 
 	@Override
@@ -257,7 +306,6 @@ class scanComparator implements Comparator<Combo>{
 	}
 	
 }
-
 class Combo {
 	
 	int distance;

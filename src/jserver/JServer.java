@@ -68,6 +68,7 @@ public class JServer {
 		connector.addInvocationHandler("Init", new InitHandler(index));
 		//add a handler for simple search 
 		connector.addInvocationHandler("SimpleSearch", new SimpleSearchHandler(simple_index));
+		connector.addInvocationHandler("Scan", new ScanHandler(index));
 		
 		System.out.println("The Server is initialized.");
 	}

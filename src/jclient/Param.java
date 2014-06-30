@@ -24,6 +24,7 @@ public class Param implements Serializable{
 		addPairs,
 		answerStringQuery,
 		answerQuery,
+		scanQuery,
 		setBound,
 		getData,
 		closeAllIndexwriters,

@@ -21,7 +21,7 @@ public class Server {
 			// TODO Auto-generated catch block
 			System.out.println(Messager.START_SERVICE_FAIL);
 			System.out.println("Please check the input parameter.");
-//			e.printStackTrace();
+			e.printStackTrace();
 		}
 	}
 }

@@ -1,19 +1,22 @@
 package jserver;
 
+import java.util.List;
+
 import javax.management.MBeanServer;
 
 import lucene.Index;
+import lucene.QueryConfig;
 
 import org.jboss.remoting.InvocationRequest;
 import org.jboss.remoting.ServerInvocationHandler;
 import org.jboss.remoting.ServerInvoker;
 import org.jboss.remoting.callback.InvokerCallbackHandler;
 
-public class InitHandler implements ServerInvocationHandler{
+public class ScanHandler implements ServerInvocationHandler {
 
-	private Index index;
+	private Index index;	
 	
-	public InitHandler(Index index) throws Throwable {
+	ScanHandler (Index index) throws Throwable {
 		
 		this.index = index;
 	}
@@ -24,25 +27,13 @@ public class InitHandler implements ServerInvocationHandler{
 		
 	}
 
+	@SuppressWarnings("unchecked object cast")
 	@Override
-	public Object invoke(InvocationRequest arg0) throws Throwable {
-		// TODO Auto-generated method stub
-		int param[] = new int[2];
-		param = (int[]) arg0.getParameter();
-		int type = param[0], num_nodes = param[1];
-		
-		if(type == Index.VECTOR_BUILD || type == Index.STRING_BUILD)
-			index.init_building();
-		else if(type == Index.STRING_SEARCH)
-			index.init_query();
-		else if(type == Index.VECTOR_SEARCH) {
-			index.init_query();
-		} else if(type == Index.VECTOR_SCAN) {
-			index.init_scan();
-		}
-		else
-			System.out.println("Initialization error");
-		return null;
+	public Object invoke(InvocationRequest arg) throws Throwable {
+
+		// TODO Auto-generated method stub	
+		List<QueryConfig> qlist = (List<QueryConfig>) arg.getParameter();
+		return index.scanSearch(qlist);
 	}
 
 	@Override
@@ -64,3 +55,4 @@ public class InitHandler implements ServerInvocationHandler{
 	}
 
 }
+

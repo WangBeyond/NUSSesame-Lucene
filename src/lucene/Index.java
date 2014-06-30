@@ -45,6 +45,7 @@ import org.apache.lucene.index.SlowCompositeReaderWrapper;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
@@ -70,6 +71,7 @@ public class Index {
 	static long searching_time = 0;
 	static long scanning_value_list_time = 0;
 	static long scanning_key_list_time = 0;
+	static long scan_searching_time = 0;
 	static long calc_time = 0;
 	static long write_time = 0;
 	static int num_build = 0;
@@ -80,6 +82,7 @@ public class Index {
 	public static int STRING_BUILD = 2;
 	public static int STRING_SEARCH = 3;
 	public static int VECTOR_SEARCH = 4;
+	public static int VECTOR_SCAN = 5;
 
 	// used in previous version, @deprecated now
 	public static int BUILD = STRING_BUILD;
@@ -195,7 +198,6 @@ public class Index {
 		doc.add(id_field);
 		doc.add(value_field);
 		doc.add(data_field);
-		
 		try {
 			MMwriter.addDocument(doc);
 		} catch (IOException e) {
@@ -238,11 +240,42 @@ public class Index {
 		}
 	}
 
+	
+	/**
+	 * initialize the scan search process
+	 */
+	public void init_scan() throws Throwable {
+		long start = System.currentTimeMillis();
+
+		if(indexReader != null)
+			indexReader.close();
+		if(areader != null)
+			areader.close();
+		
+		indexReader = DirectoryReader.open(MMapDirectory.open(indexFile));
+		// change the reader
+		areader = SlowCompositeReaderWrapper.wrap(indexReader);
+		
+		//The index for datafield (markfield)
+		//map the lucene id and doc id
+		idmap = new long[indexReader.maxDoc()];
+		Term term = new Term(this.fieldname3,"ID");
+		DocsAndPositionsEnum dp = areader.termPositionsEnum(term);
+		int lucene_id = -1, doc_id = -1;
+		BytesRef buf = new BytesRef();	
+		while((lucene_id = dp.nextDoc()) != DocsAndPositionsEnum.NO_MORE_DOCS) {
+			dp.nextPosition();
+			buf = dp.getPayload();
+			doc_id = PayloadHelper.decodeInt(buf.bytes, buf.offset);
+			idmap[lucene_id] = doc_id;
+		}
+		System.out.println("Scanning initialization done! Time:\t"+(System.currentTimeMillis()-start)+" ms");
+	}
+	
 	/**
 	 * initialize the query process
 	 * */
 	public void init_query() throws Throwable {
-
 		if(indexReader != null)
 			indexReader.close();
 		if(areader != null)
@@ -812,6 +845,76 @@ public class Index {
 
 		return revalue;
 	}
+	
+	
+	/**
+	 * search for different kinds of data
+	 * 
+	 * @return 
+	 * 			ReturnValue
+	 * @throws 
+	 * 			Throwable
+	 * */
+	public ReturnValue scanSearch(List<QueryConfig> qlist) throws Throwable {
+		long start = 0;
+		int liveDocsTotal = 0;
+		if (test) {
+			Index.num_query++;
+			start = System.currentTimeMillis();
+		}
+		// start scan search through all the values
+		ReturnValue result = new ReturnValue();
+		K = qlist.get(0).getK();
+		PriorityQueue<Combo> pq = new PriorityQueue<Combo>(K, new scanComparator());
+		Bits liveDocs = MultiFields.getLiveDocs(indexReader);
+		for (int i=0; i<indexReader.maxDoc(); i++) {
+			int distance = 0;
+		    if (liveDocs != null && !liveDocs.get(i)){
+		        continue;
+		    }
+		    liveDocsTotal ++;
+		    Document doc = indexReader.document(i);
+		    long docID = idmap[i];
+		    String valuesStr = doc.get(fieldname2);
+		    String[] values = valuesStr.split(" ");
+		    for(int j=0; j<values.length; j++){
+		    	try{
+			    QueryConfig config = qlist.get(j);
+		    	distance += qlist.get(j).calcDistance(qlist.get(j).getDimValue(),
+		    			DataProcessor.getValue(Long.valueOf(values[j]),qlist.get(j).binary_value_range_length * 1));
+		    	//System.out.println(qlist.get(j).getDimValue()+" "+Long.valueOf(values[j])+" "+distance);
+		    	} catch(NumberFormatException e){
+		    		System.out.println("NumberforamtException: docID "+ docID + " dim "+j+" value: "+values[j]);
+		    	}
+		    }
+			if(pq.size() < K) 
+				pq.add(new Combo(distance, docID));
+			else if(distance < pq.peek().distance) {
+				pq.poll();
+				pq.add(new Combo(distance, docID));
+			}
+		}
+		if (test) {
+			Index.scan_searching_time += (System.currentTimeMillis() - start);
+			System.out.println("Scan searching time:\t" + Index.scan_searching_time);
+			System.out.println("Scan iterates through "+indexReader.maxDoc()+" and liveDocs "+liveDocsTotal);
+			if (Index.num_query == 128) {
+				Index.num_query = 0;
+				Index.scan_searching_time = 0;
+			}
+		}
+		System.out.println("Nearest docIDs");
+		for(Combo combo : pq) {
+			System.out.println(combo.docID+" "+combo.distance);
+			float count_dis[] = new float[2];
+			count_dis[0] = 128;
+			count_dis[1] = combo.distance;
+			result.table.put(combo.docID, count_dis);
+		}
+
+		return result;
+	}
+	
 
 	/**
 	 * create keys for bi-direction expand
@@ -944,4 +1047,24 @@ class Candidates {
 	boolean isRealTopK = false;
 	QueueElement elements_min_upperbound[];
 	QueueElement elements_min_lowerbound[];
+}
+
+class scanComparator implements Comparator<Combo>{
+
+	@Override
+	public int compare(Combo arg0, Combo arg1) {
+		// TODO Auto-generated method stub
+		return arg1.distance - arg0.distance;
+	}
+	
+}
+class Combo {
+	
+	int distance;
+	long docID;
+	
+	Combo(int dis, long docID) {
+		this.distance = dis;
+		this.docID =  docID;
+	}
 }
