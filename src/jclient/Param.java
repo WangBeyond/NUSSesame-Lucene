@@ -21,6 +21,7 @@ public class Param implements Serializable{
 		initAllServers_int_String,
 		initAllServers_int,
 		addPairs_long_String_int,
+		addPairs_long_int_Array_int,
 		addPairs,
 		answerStringQuery,
 		answerQuery,
@@ -28,6 +29,7 @@ public class Param implements Serializable{
 		setBound,
 		getData,
 		closeAllIndexwriters,
+		closeAllBinwriters,
 		disconnectAllServers;
 	}
 	
@@ -43,6 +45,7 @@ public class Param implements Serializable{
 	public int param_int_ndim = -1;
 	public List<Integer>param_int_ndims;
 	public List<Long> param_long_values;
+	public List<Integer>param_int_values_id;
 	public int param_int_value_bi_length = -1;
 	//query
 	public QueryConfig[] qconfig = null;
@@ -56,5 +59,6 @@ public class Param implements Serializable{
 		param_long_values = new ArrayList<Long>();
 		param_int_ndims = new ArrayList<Integer>();
 		param_String_elementValues = new ArrayList<String>();
+		param_int_values_id = new ArrayList<Integer>();
 	}
 }

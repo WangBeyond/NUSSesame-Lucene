@@ -9,6 +9,7 @@ public class Pair implements Serializable{
 	public long id_long;
 	public long value_long; 
 	public long values_long[];
+	public int values_id_int[];
 	public String value_string;
 	
 	/**
@@ -43,6 +44,12 @@ public class Pair implements Serializable{
 		
 		this.id_long = id_long;
 		this.values_long = values_long;
+		this.type = type;
+	}
+	
+	public Pair(long id_long, int values_id_int[], int type) {
+		this.id_long = id_long;
+		this.values_id_int = values_id_int;
 		this.type = type;
 	}
 	

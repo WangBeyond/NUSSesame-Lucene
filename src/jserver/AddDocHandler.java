@@ -5,6 +5,7 @@
 
 package jserver;
 
+import java.io.DataOutputStream;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -23,9 +24,8 @@ import org.jboss.remoting.callback.InvokerCallbackHandler;
 public class AddDocHandler implements ServerInvocationHandler {
 
 	private Index index;
-
+	
 	AddDocHandler(Index index) throws Throwable{
-		
 		this.index = index;
 	}
 	
@@ -47,14 +47,18 @@ public class AddDocHandler implements ServerInvocationHandler {
 		Pair pair;
 		for(int i = 0; i < list.size(); i++) {
 			pair = list.get(i);
-			if(pair.getType() == Index.VECTOR_BUILD)
+			if(pair.getType() == Index.VECTOR_BUILD) {
 				index.addDoc(pair.id_long, pair.values_long);
-			else
+			} else if(pair.getType() == Index.STRING_BUILD) {
 				index.addDoc(pair.id_long, pair.value_string);
+			} else {
+				index.writeBin(pair.values_id_int);
+			}
 		}
 		return 1;
 	}
 
+	
 	@Override
 	public void removeListener(InvokerCallbackHandler arg0) {
 		// TODO Auto-generated method stub

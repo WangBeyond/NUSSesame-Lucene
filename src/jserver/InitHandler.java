@@ -37,11 +37,13 @@ public class InitHandler implements ServerInvocationHandler{
 			index.init_query();
 		else if(type == Index.VECTOR_SEARCH) {
 			index.init_query();
+		} else if(type == Index.SCAN_BUILD) {
+			index.init_binwriter();
 		} else if(type == Index.VECTOR_SCAN) {
 			index.init_scan();
+		} else {
+			System.out.println("Initialization error: invalid invocation type");
 		}
-		else
-			System.out.println("Initialization error");
 		return null;
 	}
 

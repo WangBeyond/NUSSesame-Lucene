@@ -10,6 +10,7 @@ public class Messager {
 	public static String SET_LOCATOR_FAIL = "500: set server locators failure";
 	public static String CHANGE_INDEX_FAIL = "500: change index file failure";
 	public static String CLOSE_INDEX_FAIL = "500: close index writer failure";
+	public static String CLOSE_BIN_WRITER_FAIL = "500: close binary writer failure";
 	public static String SEARCH_DONE = "200: searching done";
 	public static String START_SERVICE_FAIL = "500: start service failure";
 	public static String UNKNOWN_ERROR = "500: unknown error";

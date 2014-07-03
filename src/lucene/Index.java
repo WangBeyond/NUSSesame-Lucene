@@ -1,5 +1,8 @@
 package lucene;
 
+import java.io.DataOutputStream;
+import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -8,6 +11,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Reader;
 import java.io.StringReader;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -16,6 +21,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Map.Entry;
 
+import org.apache.commons.io.EndianUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
@@ -54,6 +60,7 @@ import org.apache.lucene.util.Version;
 
 import tool.DataProcessor;
 
+
 /**
  * building the inverted with the interface of Lucene scanning the inverted list
  * 
@@ -74,6 +81,10 @@ public class Index {
 	static long scan_searching_time = 0;
 	static long calc_time = 0;
 	static long write_time = 0;
+	static long strbuf_time = 0;
+	static long adddoc_time = 0;
+	static long startbuilding_time = 0;
+	static long initbuilding_time = 0;
 	static int num_build = 0;
 	static int num_query = 0;
 
@@ -83,6 +94,7 @@ public class Index {
 	public static int STRING_SEARCH = 3;
 	public static int VECTOR_SEARCH = 4;
 	public static int VECTOR_SCAN = 5;
+	public static int SCAN_BUILD = 6;
 
 	// used in previous version, @deprecated now
 	public static int BUILD = STRING_BUILD;
@@ -130,6 +142,10 @@ public class Index {
 	private StringBuffer strbuf;
 	// to create the data_field
 	private StringBuffer databuf;
+	
+	private DataOutputStream binOut;
+	private DataInputStream binIn;
+	private ArrayList<int[]> vectorList;
 
 
 	public Index() {
@@ -147,7 +163,8 @@ public class Index {
 	 * @throws Throwable
 	 * */
 	public void init_building() throws Throwable {
-
+		startbuilding_time = System.currentTimeMillis();
+		
 		// PayloadAnalyzer to map the Lucene id and Doc id
 		payload_analyzer = new PayloadAnalyzer(new IntegerEncoder());
 		// MMap
@@ -170,6 +187,7 @@ public class Index {
 		
 		strbuf = new StringBuffer();
 		databuf = new StringBuffer();
+		initbuilding_time = System.currentTimeMillis() - startbuilding_time;
 	}   
 
 	/**
@@ -187,19 +205,23 @@ public class Index {
 		//clear the StringBuffer
 		strbuf.setLength(0);
 		//set new Text for payload analyzer
+		long start = System.currentTimeMillis();
 		for (int i = 0; i < values.length; i++) {
 			strbuf.append(values[i]+" ");
 		}
+		strbuf_time += (System.currentTimeMillis()-start);
 		//set fields for document
 		id_field.setLongValue(id);
 		value_field.setStringValue(strbuf.toString());
 		data_field.setStringValue("ID|"+id);
-
+		
+		long start2 = System.currentTimeMillis();
 		doc.add(id_field);
 		doc.add(value_field);
 		doc.add(data_field);
 		try {
 			MMwriter.addDocument(doc);
+			adddoc_time += (System.currentTimeMillis()-start2);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.err.println("index writer error");
@@ -239,38 +261,60 @@ public class Index {
 				e.printStackTrace();
 		}
 	}
-
 	
+	
+	
+	/**
+	 * initialize the binary writer
+	 */
+	public void init_binwriter() {
+		try {
+			this.binOut = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(indexFile)));
+		} catch (IOException e) {
+			System.out.println("binary writer error");
+			if (debug)
+				e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * write the value string to the binary output
+	 * @param v
+	 */
+	public void writeBin(int[] values) throws Throwable {
+		int id = values[values.length - 1];
+		binOut.writeInt(EndianUtils.swapInteger(id));
+		for (int i = 0; i < values.length - 1; i++) {
+	        binOut.writeInt( EndianUtils.swapInteger(values[i]));
+		}
+	}
+	
+
 	/**
 	 * initialize the scan search process
 	 */
-	public void init_scan() throws Throwable {
-		long start = System.currentTimeMillis();
-
-		if(indexReader != null)
-			indexReader.close();
-		if(areader != null)
-			areader.close();
+	public void init_scan() throws IOException {
+		DIM_RANGE = 128;
+		binIn = new DataInputStream(new BufferedInputStream (new FileInputStream(indexFile)));
+		vectorList = new ArrayList<int[]>();
 		
-		indexReader = DirectoryReader.open(MMapDirectory.open(indexFile));
-		// change the reader
-		areader = SlowCompositeReaderWrapper.wrap(indexReader);
-		
-		//The index for datafield (markfield)
-		//map the lucene id and doc id
-		idmap = new long[indexReader.maxDoc()];
-		Term term = new Term(this.fieldname3,"ID");
-		DocsAndPositionsEnum dp = areader.termPositionsEnum(term);
-		int lucene_id = -1, doc_id = -1;
-		BytesRef buf = new BytesRef();	
-		while((lucene_id = dp.nextDoc()) != DocsAndPositionsEnum.NO_MORE_DOCS) {
-			dp.nextPosition();
-			buf = dp.getPayload();
-			doc_id = PayloadHelper.decodeInt(buf.bytes, buf.offset);
-			idmap[lucene_id] = doc_id;
-		}
-		System.out.println("Scanning initialization done! Time:\t"+(System.currentTimeMillis()-start)+" ms");
+		try {
+			while (true) {
+				// read int for sift feature
+				int[] value_id = new int[DIM_RANGE + 1];
+				int vectorId = EndianUtils.swapInteger(binIn.readInt());
+				value_id[DIM_RANGE] = vectorId;
+				for (int dim = 0; dim < DIM_RANGE; dim++) {
+					int value = EndianUtils.swapInteger(binIn.readInt());
+					value_id[dim] = value;
+				}
+				vectorList.add(value_id);
+			}
+			} catch (EOFException e) {
+				System.out.println("Finish read binary data file");
+			}	
 	}
+
 	
 	/**
 	 * initialize the query process
@@ -857,7 +901,6 @@ public class Index {
 	 * */
 	public ReturnValue scanSearch(List<QueryConfig> qlist) throws Throwable {
 		long start = 0;
-		int liveDocsTotal = 0;
 		if (test) {
 			Index.num_query++;
 			start = System.currentTimeMillis();
@@ -866,46 +909,33 @@ public class Index {
 		ReturnValue result = new ReturnValue();
 		K = qlist.get(0).getK();
 		PriorityQueue<Combo> pq = new PriorityQueue<Combo>(K, new scanComparator());
-		Bits liveDocs = MultiFields.getLiveDocs(indexReader);
-		for (int i=0; i<indexReader.maxDoc(); i++) {
+		for (int i = 0; i < vectorList.size(); i ++) {
 			int distance = 0;
-		    if (liveDocs != null && !liveDocs.get(i)){
-		        continue;
-		    }
-		    liveDocsTotal ++;
-		    Document doc = indexReader.document(i);
-		    long docID = idmap[i];
-		    String valuesStr = doc.get(fieldname2);
-		    String[] values = valuesStr.split(" ");
-		    for(int j=0; j<values.length; j++){
-		    	try{
-			    QueryConfig config = qlist.get(j);
-		    	distance += qlist.get(j).calcDistance(qlist.get(j).getDimValue(),
-		    			DataProcessor.getValue(Long.valueOf(values[j]),qlist.get(j).binary_value_range_length * 1));
-		    	//System.out.println(qlist.get(j).getDimValue()+" "+Long.valueOf(values[j])+" "+distance);
-		    	} catch(NumberFormatException e){
-		    		System.out.println("NumberforamtException: docID "+ docID + " dim "+j+" value: "+values[j]);
-		    	}
-		    }
+			int[] vector = vectorList.get(i);
+			long vectorId = (long)vector[DIM_RANGE];
+			for (int j = 0; j < DIM_RANGE; j++) {
+				distance += qlist.get(j).calcDistance(qlist.get(j).getDimValue(),
+		    			DataProcessor.getValue(Long.valueOf(vector[j]),qlist.get(j).binary_value_range_length * 1));
+			} 
 			if(pq.size() < K) 
-				pq.add(new Combo(distance, docID));
+				pq.add(new Combo(distance, vectorId));
 			else if(distance < pq.peek().distance) {
 				pq.poll();
-				pq.add(new Combo(distance, docID));
+				pq.add(new Combo(distance, vectorId));
 			}
 		}
+		
 		if (test) {
 			Index.scan_searching_time += (System.currentTimeMillis() - start);
 			System.out.println("Scan searching time:\t" + Index.scan_searching_time);
-			System.out.println("Scan iterates through "+indexReader.maxDoc()+" and liveDocs "+liveDocsTotal);
 			if (Index.num_query == 128) {
 				Index.num_query = 0;
 				Index.scan_searching_time = 0;
 			}
 		}
-		System.out.println("Nearest docIDs");
+		System.out.println("Nearest vecotrIDs");
 		for(Combo combo : pq) {
-			System.out.println(combo.docID+" "+combo.distance);
+			System.out.println(combo.docID+"\t"+combo.distance);
 			float count_dis[] = new float[2];
 			count_dis[0] = 128;
 			count_dis[1] = combo.distance;
@@ -938,6 +968,15 @@ public class Index {
 
 	public void closeWriter() throws Throwable {
 		MMwriter.close();
+		if(test) {
+			System.out.println("initTime:\t"+initbuilding_time );
+			System.out.println("string buffer time:\t"+strbuf_time+" adddoc time:\t"+adddoc_time);
+			System.out.println("total time:\t"+(System.currentTimeMillis()-startbuilding_time));
+		}
+	}
+	
+	public void closeBinwriter() throws Throwable {
+		binOut.close();
 	}
 
 	/**

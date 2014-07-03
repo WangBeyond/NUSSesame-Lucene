@@ -82,8 +82,9 @@ public class FunctionHandler implements ServerInvocationHandler {
 		// TODO Auto-generated method stub
 		Param parameter = (Param)arg0.getParameter();
 		//call different functions on master node based on the parameter type
-		if(parameter.function_type == Param.FUNCTION_TYPE.connectAllServers_String)
+		if(parameter.function_type == Param.FUNCTION_TYPE.connectAllServers_String) {
 			this.connectAllServers(parameter.param_String_index_file_name);
+		}
 		
 		if(parameter.function_type == Param.FUNCTION_TYPE.initAllServers_int_String)
 			this.initAllServers(parameter.param_int_type, parameter.param_String_index_file_name);
@@ -104,6 +105,9 @@ public class FunctionHandler implements ServerInvocationHandler {
 		if(parameter.function_type == Param.FUNCTION_TYPE.addPairs_long_String_int) 
 			this.addPairs(parameter.param_long_elementIDs, parameter.param_String_elementValues, parameter.param_int_type);
 		
+		if(parameter.function_type == Param.FUNCTION_TYPE.addPairs_long_int_Array_int) 
+			this.addPairs(parameter.param_long_elementIDs, parameter.param_int_ndims, parameter.param_int_values_id, parameter.param_int_type);
+
 		if(parameter.function_type == Param.FUNCTION_TYPE.answerQuery)
 			return this.answerQuery(parameter.qconfig);
 		
@@ -117,7 +121,10 @@ public class FunctionHandler implements ServerInvocationHandler {
 			return this.getData(parameter.param_long_elementID);
 		
 		if(parameter.function_type == Param.FUNCTION_TYPE.closeAllIndexwriters)
-			this.closeAllIndexwriters();
+			this.closeAllIndexwriters();;
+		
+		if(parameter.function_type == Param.FUNCTION_TYPE.closeAllBinwriters)
+			this.closeAllBinwriters();
 		
 		if(parameter.function_type == Param.FUNCTION_TYPE.disconnectAllServers){
 			this.disconnectAllServers();
@@ -309,6 +316,7 @@ public class FunctionHandler implements ServerInvocationHandler {
 		flush();
 	}
 
+	
 	/**
 	 * we can insert the whole vector each time.
 	 * @param ndims: an list of the number of dimensions
@@ -328,6 +336,29 @@ public class FunctionHandler implements ServerInvocationHandler {
 			}
 			this.pair_queues.get(Strategy.distributeTask(machines.size(), elem_id))
 				.add(new Pair(elem_id, values_long, type));
+		}
+		flush();
+	}
+	
+	
+	/**
+	 * add id-value pair and write the scanned binary file
+	 * for linear scan
+	 **/
+	public void addPairs(List<Long> element_ids, List<Integer> ndims, List<Integer> values_id, int type) {
+		
+		int value_index = 0, elem_dim;
+		long elem_id;
+		for(int i = 0; i < element_ids.size(); i++) {
+			elem_id = element_ids.get(i);
+			elem_dim = ndims.get(i);
+			int values_id_int[] = new int[elem_dim + 1];
+			for(int j = 0; j < elem_dim+1; j++) {
+				values_id_int[j] = values_id.get(value_index);
+				value_index++;
+			}
+			this.pair_queues.get(Strategy.distributeTask(machines.size(), elem_id))
+				.add(new Pair(elem_id, values_id_int, type));
 		}
 		flush();
 	}
@@ -626,7 +657,7 @@ public class FunctionHandler implements ServerInvocationHandler {
 		
 		machines.elementAt(id).setSubsystem("CloseWriter");
 		try {
-			machines.elementAt(id).invoke(null);
+			machines.elementAt(id).invoke(Index.VECTOR_BUILD);
 		} catch (Throwable e) {
 			// TODO Auto-generated catch block
 			System.out.println(Messager.CLOSE_INDEX_FAIL);
@@ -642,6 +673,28 @@ public class FunctionHandler implements ServerInvocationHandler {
 		this.flush();
 		for(int i = 0;i < machines.size(); i++)
 			this.closeIndexwriter(i);	
+	}
+	
+	public void closeBinwriter(int id) {
+		
+		machines.elementAt(id).setSubsystem("CloseWriter");
+		try {
+			machines.elementAt(id).invoke(Index.SCAN_BUILD);
+		} catch (Throwable e) {
+			// TODO Auto-generated catch block
+			System.out.println(Messager.CLOSE_BIN_WRITER_FAIL);
+			if(debug)
+				e.printStackTrace();
+			System.exit(0);
+		
+		}
+	}
+	
+	public void closeAllBinwriters() {
+		
+		this.flush();
+		for(int i = 0;i < machines.size(); i++)
+			this.closeBinwriter(i);
 	}
 	
 	/**

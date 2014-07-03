@@ -30,8 +30,15 @@ public class CloseWriterHandler  implements ServerInvocationHandler {
 	@Override
 	public Object invoke(InvocationRequest arg0) throws Throwable {
 		// TODO Auto-generated method stub
-		index.closeWriter();
-		System.out.println("The index is closed");
+		Object object = arg0.getParameter();
+		Integer type = (Integer)object;
+		if(type == Index.VECTOR_BUILD) {
+			index.closeWriter();
+			System.out.println("The index is closed");
+		} else {
+			index.closeBinwriter();
+			System.out.println("The binary writer is closed");
+		}
 		return "The index is closed";
 	}
 

@@ -2,6 +2,7 @@ package jclient;
 
 import java.net.MalformedURLException;
 
+import lucene.Index;
 import lucene.QueryConfig;
 import lucene.ReturnValue;
 
@@ -63,7 +64,8 @@ public class JClient {
 				System.exit(0);
 			}
 			else if(parameters.function_type == Param.FUNCTION_TYPE.addPairs_long_String_int
-					|| parameters.function_type == Param.FUNCTION_TYPE.addPairs) {
+					|| parameters.function_type == Param.FUNCTION_TYPE.addPairs 
+					|| parameters.function_type == Param.FUNCTION_TYPE.addPairs_long_int_Array_int) {
 				System.out.println(Messager.INSERTION_FAIL);
 			}
 			else if(parameters.function_type == Param.FUNCTION_TYPE.changeIndexfile_String) {
@@ -76,6 +78,9 @@ public class JClient {
 			}
 			else if(parameters.function_type == Param.FUNCTION_TYPE.closeAllIndexwriters) {
 				System.out.println(Messager.CLOSE_INDEX_FAIL);
+			}
+			else if(parameters.function_type == Param.FUNCTION_TYPE.closeAllBinwriters) {
+				System.out.println(Messager.CLOSE_BIN_WRITER_FAIL);
 			}
 			else
 				System.out.println(Messager.UNKNOWN_ERROR);
@@ -105,6 +110,12 @@ public class JClient {
 	public void closeAllIndexwriters() {
 		
 		parameters.function_type = Param.FUNCTION_TYPE.closeAllIndexwriters;
+		this.callMasterFunction(parameters);
+	}
+	
+	public void closeAllBinwriters() {
+		
+		parameters.function_type = Param.FUNCTION_TYPE.closeAllBinwriters;
 		this.callMasterFunction(parameters);
 	}
 	
@@ -164,6 +175,20 @@ public class JClient {
 			flush();
 	}
 	
+	public void addPairs(long element_id, int ndim, int values_id[], int type) {
+		
+		parameters.function_type = Param.FUNCTION_TYPE.addPairs_long_int_Array_int;
+		parameters.param_long_elementIDs.add(element_id);
+		parameters.param_int_ndims.add(ndim);
+		parameters.param_int_type = type;
+		for(int i = 0; i < ndim+1; i++) //iterates through dim of values and an id
+			parameters.param_int_values_id.add(values_id[i]);
+		
+		//if there are enough data, then flush
+		this.curVecNum++;
+		if(this.curVecNum > this.maxVecNum) 
+			flush();
+	}	
 	public void flush() {
 		
 		//call the remote function on master node
@@ -176,6 +201,8 @@ public class JClient {
 			parameters.param_long_values.clear();
 		if(parameters.param_String_elementValues != null)
 			parameters.param_String_elementValues.clear();
+		if(parameters.param_int_values_id != null)
+			parameters.param_int_values_id.clear();
 		//reset the counters
 		curVecNum = 0;
 	}

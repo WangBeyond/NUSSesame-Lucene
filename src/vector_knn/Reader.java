@@ -55,6 +55,7 @@ public class Reader {
 		return value;
 	}
 	
+	
 	public void closeReader() {
 		
 		try {

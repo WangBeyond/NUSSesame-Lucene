@@ -1,6 +1,7 @@
  package vector_knn;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ public class Client {
 	private static int vec_num;
 	private static int nodes_num;
 	private static String vec_index = "Index"+vec_num;
+	private static String vec_scanfile = "Subfile"+vec_num;
 	
 	Client(String ip) throws Throwable {
 		
@@ -116,6 +118,7 @@ public class Client {
 				config[i].num_combination = COMBINE_DIM;
 				//set query
 				config[i].setQuerylong(i, combine_values);
+				
 				//set bi-direction search range
 				config[i].setRange(10, 10);		
 				//set top K
@@ -147,6 +150,79 @@ public class Client {
 			System.out.println("seraching time: "+(endtime - starttime)+" ms");
 		}
 		System.out.println("average searching time: "+ avergetime/qid+" ms");
+	}
+	
+
+	int scan_topK_search() throws Throwable {
+		jclient.connectAllServers(vec_scanfile);
+
+		BufferedReader buf = new BufferedReader(new InputStreamReader(new FileInputStream("data/query.txt")));
+		String line = "";	
+		K = 5;
+		int qid = 0;
+		int distance = -1;
+		long averTime = 0;
+		while((line = buf.readLine()) != null) {
+			qid++;
+			String values[] = line.split(" ");
+			//maximum number of range and value
+			int dim_range= 128 / COMBINE_DIM;
+			long value_range = 255;
+			SIFTConfig config[] = new SIFTConfig[dim_range];
+			for(int i = 0; i < dim_range; i++) {
+				//initialize a query configuration, set query id
+				config[i] = new SIFTConfig(qid);
+				//set the domain
+				config[i].setDimValueRange(dim_range, value_range);
+				//Does not support dimension combination
+				int combine_values[] = new int[1];
+				combine_values[0] = Integer.valueOf(values[i]);
+				//set query
+				config[i].setQuerylong(i, combine_values);	
+				//set top K
+				config[i].setK(K);
+			}
+			jclient.initAllServers(Index.VECTOR_SCAN, vec_scanfile);
+			System.out.println("scanning...");
+			long startTime = System.currentTimeMillis();
+			ReturnValue revalue = jclient.scanQuery(config);
+			long endTime = System.currentTimeMillis();
+			averTime += (endTime - startTime);
+			for(int i = 0; i < K; i++) {
+				List<Map.Entry<Long, float[]>>list = revalue.sortedOndis();
+				if(i == 0){
+					distance = Math.round(list.get(0).getValue()[1]);
+				}
+				System.out.println(list.get(i).getKey()+"\t"+list.get(i).getValue()[1]);
+			}
+			System.out.println("scanning time: "+(endTime-startTime)+" ms");
+		}
+
+		System.out.println("avg time:\t"+averTime/qid);
+
+		return distance;
+	}
+	
+	public void distributeDatafile(String filename, int num_elements, String scan_file) throws Throwable {
+		System.out.println("Partition...");
+		jclient.connectAllServers(scan_file);
+		reader = new Reader(filename);
+		reader.openReader();
+		
+		jclient.initAllServers(Index.SCAN_BUILD, scan_file);
+		jclient.setMaxVecNum(5000);
+				
+		for (int i = 0; i < num_elements; i++) {
+			int[] value_id = reader.getFeature(NUM_DIM);
+			
+			jclient.addPairs(value_id[NUM_DIM], NUM_DIM, value_id, Index.SCAN_BUILD);
+			
+			if(i%10 == 0)
+				System.out.println(i);
+		}
+		jclient.flush();
+		jclient.closeAllBinwriters();
+		reader.closeReader();
 	}
 	
 	//randomly pick 5% of the original data in order to get a bound
@@ -199,57 +275,6 @@ public class Client {
 		return dis;
 	}
 	
-	int scan_topK_search() throws Throwable {
-		jclient.connectAllServers(vec_index);
-
-		BufferedReader buf = new BufferedReader(new InputStreamReader(new FileInputStream("data/query.txt")));
-		String line = "";	
-		K = 5;
-		int qid = 0;
-		int distance = -1;
-		long averTime = 0;
-		while((line = buf.readLine()) != null) {
-			qid++;
-			String values[] = line.split(" ");
-			//maximum number of range and value
-			int dim_range= 128 / COMBINE_DIM;
-			long value_range = 255;
-			SIFTConfig config[] = new SIFTConfig[dim_range];
-			for(int i = 0; i < dim_range; i++) {
-				//initialize a query configuration, set query id
-				config[i] = new SIFTConfig(qid);
-				//set the domain
-				config[i].setDimValueRange(dim_range, value_range);
-				//Does not support dimension combination
-				int combine_values[] = new int[1];
-				combine_values[0] = Integer.valueOf(values[i]);
-				//set query
-				config[i].setQuerylong(i, combine_values);
-				//set bi-direction search range
-				config[i].setRange(10, 10);		
-				//set top K
-				config[i].setK(K);
-			}
-			jclient.initAllServers(Index.VECTOR_SCAN, vec_index);
-			System.out.println("scanning...");
-			long startTime = System.currentTimeMillis();
-			ReturnValue revalue = jclient.scanQuery(config);
-			long endTime = System.currentTimeMillis();
-			averTime += (endTime - startTime);
-			for(int i = 0; i < K; i++) {
-				List<Map.Entry<Long, float[]>>list = revalue.sortedOndis();
-				if(i == 0){
-					distance = Math.round(list.get(0).getValue()[1]);
-				}
-				System.out.println(list.get(i).getKey()+"\t"+list.get(i).getValue()[1]);
-			}
-			System.out.println("scanning time: "+(endTime-startTime)+" ms");
-		}
-
-		System.out.println("avg time:\t"+averTime/qid);
-
-		return distance;
-	}
 	
 	public static void main(String args[]) throws Throwable {
 		
@@ -257,14 +282,16 @@ public class Client {
 		Client c = new Client("socket://127.0.0.1:8888");
 //		Client c = new Client("socket://137.132.145.132:8888");
 		vec_num = 250000;
-		nodes_num = 8;
+		nodes_num = 1;
 		vec_index = "Index_"+nodes_num+"_"+vec_num;
+		vec_scanfile = "Scanfile_"+nodes_num+"_"+vec_num+".bin";
 //		
 //		if(args.length > 0)
 //			vec_num = Integer.valueOf(args[0]);
-//		debug = false;
+		debug = false;
 //		long start = System.currentTimeMillis();
 //		c.buildIndex(datafile, vec_num, vec_index);
+//		c.distributeDatafile(datafile, vec_num, vec_scanfile);
 //		System.out.println("Building Done! Time: "+(System.currentTimeMillis() - start)+"ms");
 //		System.out.println();
 		
