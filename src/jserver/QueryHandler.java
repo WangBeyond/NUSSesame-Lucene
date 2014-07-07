@@ -1,5 +1,6 @@
 package jserver;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.management.MBeanServer;
@@ -34,8 +35,15 @@ public class QueryHandler implements ServerInvocationHandler {
 	public Object invoke(InvocationRequest arg) throws Throwable {
 
 		// TODO Auto-generated method stub	
-		List<QueryConfig> qlist = (List<QueryConfig>) arg.getParameter();
-		return index.generalSearch(qlist);
+		try {
+			@SuppressWarnings("unchecked")
+			List<QueryConfig> qlist = (List<QueryConfig>) arg.getParameter();
+			return index.generalSearch(qlist);
+		} catch(ClassCastException e) {
+			@SuppressWarnings("unchecked")
+			List<List<QueryConfig>> qlists = (List<List<QueryConfig>>) arg.getParameter();
+			return index.rangeQuery(qlists);
+		}
 	}
 
 	@Override

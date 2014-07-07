@@ -117,6 +117,9 @@ public class FunctionHandler implements ServerInvocationHandler {
 		if(parameter.function_type == Param.FUNCTION_TYPE.scanQuery)
 			return this.scanQuery(parameter.qconfig);
 		
+		if(parameter.function_type == Param.FUNCTION_TYPE.rangeQuery)
+			return this.rangeQuery(parameter.qconfig1, parameter.qconfig2);
+		
 		if(parameter.function_type == Param.FUNCTION_TYPE.getData)
 			return this.getData(parameter.param_long_elementID);
 		
@@ -479,13 +482,12 @@ public class FunctionHandler implements ServerInvocationHandler {
 	
 	
 	/**
-	 * scan the vectors
+	 * scan the vectors without index structure
 	 * master node collects the local topK results from slave nodes
 	 * then select the global TopK
 	 */
 	public ReturnValue scanQuery(QueryConfig qconfigs[]) {
 
-		long[] index = new long[qconfigs[0].getK()];
 		ReturnValue revalue = new ReturnValue();
 		try {
 			revalue = this.getReturnValueByScanningNode(qconfigs);
@@ -497,6 +499,30 @@ public class FunctionHandler implements ServerInvocationHandler {
 				e.printStackTrace();
 		}
 		return revalue;
+	}
+	
+	
+	/**Use indexing to answer range query
+	 * master node collects the results with the range constrained by the two queries
+	 */
+	public long[] rangeQuery(QueryConfig qconfigs1[], QueryConfig qconfigs2[]) {
+//		Candidates candidates = null;
+		ReturnValue revalue = new ReturnValue();
+		try {
+			revalue = this.getReturnValueByNode(qconfigs1, qconfigs2);
+		} catch (Throwable e) {
+			
+			System.out.println(Messager.SEARCH_FAIL);
+			if(debug)
+			// TODO Auto-generated catch block
+				e.printStackTrace();
+		}
+		long[] indexArray = new long[revalue.indexList.size()];
+		System.out.println(revalue.indexList.size());
+		for (int i = 0; i < revalue.indexList.size(); i++) {
+			indexArray[i] = revalue.indexList.get(i);
+		}
+		return indexArray;
 	}
 	
 	
@@ -534,6 +560,73 @@ public class FunctionHandler implements ServerInvocationHandler {
 			num_of_tasks++;
 			Future<ReturnValue> future = executor.submit(
 					new NodeTask(machines.elementAt(i), list));
+			future_vec.add(future);
+		}
+		
+		long start = System.currentTimeMillis();
+		long merge_time = 0;
+		// wait for all the tasks are done
+		int num_of_returned = 0;
+		while(num_of_returned < num_of_tasks) {
+			Thread.sleep(SLEEP_TIME);
+			for(int i = 0; i < future_vec.size(); i++) {
+				if(future_vec.elementAt(i) != null && future_vec.elementAt(i).isDone()) {
+					num_of_returned++;
+					ReturnValue revalue = future_vec.elementAt(i).get();
+					System.out.println("node "+i+" finish time "+(System.currentTimeMillis()-start)+" ms");
+					// merge the results from different nodes
+					long merge_start = System.currentTimeMillis();
+					result.merge(revalue);
+					merge_time += System.currentTimeMillis() - merge_start;
+					// clear the task
+					future_vec.setElementAt(null, i);
+				}
+			}
+		}
+		System.out.println("Merge time in function:\t"+merge_time+" ms");
+		System.out.println("Wait for return:\t"+(System.currentTimeMillis() - start - merge_time+" ms"));
+		executor.shutdown();
+		return result;
+	}
+	
+	
+	/**
+	 * This one is designed for range query
+	 * */
+	private ReturnValue getReturnValueByNode(QueryConfig qconfigs1[], QueryConfig qconfigs2[]) throws Throwable {
+		
+		// final result
+		ReturnValue result = new ReturnValue();
+		
+		// set sub system
+		for(int i = 0; i < machines.size(); i++)
+			machines.elementAt(i).setSubsystem("Query");
+		//create a thread pool for queries
+		ExecutorService executor = Executors.newFixedThreadPool(fixed_thread_num);
+		
+		List<QueryConfig> list1 = new ArrayList<QueryConfig>(qconfigs1.length);	
+		for(int i = 0;i < qconfigs1.length; i++)
+			list1.add(qconfigs1[i]);
+		if(qconfigs2[0].getType() == Index.VECTOR_SEARCH) {
+			for(int i = 0;i < qconfigs1.length; i++) 
+				list1.set(qconfigs1[i].getDim(), qconfigs1[i]);
+		}
+		
+		List<QueryConfig> list2 = new ArrayList<QueryConfig>(qconfigs2.length);	
+		for(int i = 0;i < qconfigs2.length; i++)
+			list2.add(qconfigs2[i]);
+		if(qconfigs2[0].getType() == Index.VECTOR_SEARCH) {
+			for(int i = 0;i < qconfigs2.length; i++)
+				list2.set(qconfigs2[i].getDim(), qconfigs2[i]);
+		}
+		
+		Vector<Future<ReturnValue>> future_vec = new Vector<Future<ReturnValue>>();
+		int num_of_tasks = 0;
+		// submit the task to threadpool
+		for(int i = 0; i < machines.size(); i++) {
+			num_of_tasks++;
+			Future<ReturnValue> future = executor.submit(
+					new NodeTask(machines.elementAt(i), list1, list2));
 			future_vec.add(future);
 		}
 		
@@ -745,11 +838,22 @@ class NodeTask implements Callable<ReturnValue> {
 
 	private Client machine;
 	private List<QueryConfig> querylist;
+	private List<List<QueryConfig>> querylistArray;
+	boolean isRangeQuery = false;
 	
 	NodeTask(Client machine,List<QueryConfig> qlist) {
 		
 		this.machine = machine;
 		this.querylist = qlist;
+		isRangeQuery = false;
+	}
+	
+	NodeTask(Client machine, List<QueryConfig> qlist1, List<QueryConfig> qlist2) {
+		this.machine = machine;
+		this.querylistArray = new ArrayList<List<QueryConfig>>();
+		this.querylistArray.add(qlist1);
+		this.querylistArray.add(qlist2);
+		isRangeQuery = true;
 	}
 	
 	@SuppressWarnings("unchecked cast")
@@ -758,7 +862,11 @@ class NodeTask implements Callable<ReturnValue> {
 		// TODO Auto-generated method stub
 		ReturnValue revalue = null;
 		try {
-			revalue = (ReturnValue) machine.invoke(this.querylist);
+			if(isRangeQuery) {
+				revalue = (ReturnValue) machine.invoke(this.querylistArray);
+			} else {
+				revalue = (ReturnValue) machine.invoke(this.querylist);
+			}
 		} catch (Throwable e) {
 			// TODO Auto-generated catch block
 			System.out.println("There are problems in NodeTask.");

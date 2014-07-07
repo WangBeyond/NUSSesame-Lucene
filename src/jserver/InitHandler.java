@@ -31,17 +31,19 @@ public class InitHandler implements ServerInvocationHandler{
 		param = (int[]) arg0.getParameter();
 		int type = param[0], num_nodes = param[1];
 		
-		if(type == Index.VECTOR_BUILD || type == Index.STRING_BUILD)
+		if(type == Index.VECTOR_BUILD || type == Index.STRING_BUILD) {
 			index.init_building();
-		else if(type == Index.STRING_SEARCH)
+		} else if(type == Index.STRING_SEARCH){
 			index.init_query();
-		else if(type == Index.VECTOR_SEARCH) {
+		} else if(type == Index.VECTOR_SEARCH) {
 			index.init_query();
 		} else if(type == Index.SCAN_BUILD) {
 			index.init_binwriter();
 		} else if(type == Index.VECTOR_SCAN) {
 			index.init_scan();
-		} else {
+		} else if(type == Index.RANGE_QUERY) {
+			index.init_rangequery();
+		}else {
 			System.out.println("Initialization error: invalid invocation type");
 		}
 		return null;

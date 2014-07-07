@@ -228,6 +228,15 @@ public class JClient {
 		return (ReturnValue) callMasterFunction(parameters);
 	}
 	
+	public long[] rangeQuery(QueryConfig config1[], QueryConfig config2[]) {
+		
+		parameters.function_type = Param.FUNCTION_TYPE.rangeQuery;
+		parameters.qconfig1 = config1;
+		parameters.qconfig2 = config2;
+		return (long[]) callMasterFunction(parameters);
+		
+	}
+	
 	public String getData(long index) {
 		
 		parameters.function_type = Param.FUNCTION_TYPE.getData;

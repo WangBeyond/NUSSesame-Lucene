@@ -20,6 +20,8 @@ public class Client {
 	public static boolean debug = true;
 	public static int NUM_DIM = 128;
 	public static int COMBINE_DIM = 1;
+	//Two vectors for each range query
+	public static int RANGE_QUERY_NUM = 2;
 	public static int K = 1;
 
 	private JClient jclient;
@@ -116,7 +118,7 @@ public class Client {
 					combine_values[j] = Integer.valueOf(values[i * COMBINE_DIM + j]);
 				}
 				config[i].num_combination = COMBINE_DIM;
-				//set query
+				//set query 
 				config[i].setQuerylong(i, combine_values);
 				
 				//set bi-direction search range
@@ -153,6 +155,54 @@ public class Client {
 	}
 	
 
+	int testRangeQuery() throws Throwable {
+		jclient.connectAllServers(vec_index);
+		BufferedReader buf = new BufferedReader(new InputStreamReader(new FileInputStream("data/rangequery.txt")));
+		String line = "";	
+		int qid = 0;
+		int distance = -1;
+		long averTime = 0;
+		while((line = buf.readLine()) != null) {
+			qid++;
+			int dim_range= 128 / COMBINE_DIM;
+			long value_range = 255;
+			SIFTConfig twoConfigs[][] = new SIFTConfig[2][dim_range];
+			for(int i = 0; i < RANGE_QUERY_NUM; i++) {
+				SIFTConfig config[] = twoConfigs[i];
+				String values[] = line.split(" ");
+				//maximum number of range and value
+				for(int j = 0; j < dim_range; j++) {
+					//initialize a query configuration, set query id
+					config[j] = new SIFTConfig(qid);
+					//set the domain
+					config[j].setDimValueRange(dim_range, value_range);
+					//Does not support dimension combination
+					int combine_values[] = new int[1];
+					combine_values[0] = Integer.valueOf(values[j]);
+					//set query
+					config[j].setQuerylong(j, combine_values);	
+				}
+				line = buf.readLine();
+			}
+
+			jclient.initAllServers(Index.RANGE_QUERY, vec_index);
+			System.out.println("range querying...");
+			long startTime = System.currentTimeMillis();
+			long[] indexList = jclient.rangeQuery(twoConfigs[0], twoConfigs[1]);
+			long endTime = System.currentTimeMillis();
+			averTime += (endTime - startTime);
+			System.out.println("Found "+indexList.length+" vectors:");
+			for(int i = 0; i < indexList.length; i++) {
+				System.out.println(indexList[i]);
+			}
+			System.out.println("scanning time: "+(endTime-startTime)+" ms");
+		}
+
+		System.out.println("avg time:\t"+averTime/qid);
+
+		return distance;
+	}
+	
 	int scan_topK_search() throws Throwable {
 		jclient.connectAllServers(vec_scanfile);
 
@@ -296,8 +346,8 @@ public class Client {
 //		System.out.println();
 		
 //		c.testTopKsearch();
-		c.scan_topK_search();
-		
+//		c.scan_topK_search();
+		c.testRangeQuery();
 	}
 }
 

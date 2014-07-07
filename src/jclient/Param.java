@@ -26,6 +26,7 @@ public class Param implements Serializable{
 		answerStringQuery,
 		answerQuery,
 		scanQuery,
+		rangeQuery,
 		setBound,
 		getData,
 		closeAllIndexwriters,
@@ -49,6 +50,8 @@ public class Param implements Serializable{
 	public int param_int_value_bi_length = -1;
 	//query
 	public QueryConfig[] qconfig = null;
+	public QueryConfig[] qconfig1 = null;
+	public QueryConfig[] qconfig2 = null;
 	public int param_int_topK = -1;
 	public float param_min_lowerbound = Float.MIN_VALUE; 
 	
