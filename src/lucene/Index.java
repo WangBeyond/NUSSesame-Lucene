@@ -58,7 +58,9 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.NumericUtils;
 import org.apache.lucene.util.Version;
 
+import tool.Aggregation;
 import tool.DataProcessor;
+import tool.SIFTAggregation;
 
 /**
  * building the inverted with the interface of Lucene scanning the inverted list
@@ -933,7 +935,7 @@ public class Index {
 		return revalue;
 	}
 
-	public ReturnValue rangeQuery(List<List<QueryConfig>> qlists)
+	public ReturnValue rangeQuery(QueryVector queryVector, Aggregation aggregationFuction)
 			throws Throwable {
 		long start = 0;
 		int liveDocsTotal = 0;
@@ -941,14 +943,12 @@ public class Index {
 			Index.num_query++;
 			start = System.currentTimeMillis();
 		}
-		List<QueryConfig> rangeQlist1 = qlists.get(0);
-		List<QueryConfig> rangeQlist2 = qlists.get(1);
 		ReturnValue result = new ReturnValue();
 		Bits liveDocs = MultiFields.getLiveDocs(indexReader);
 
 		// start scan search through all the values
 		for (int i = 0; i < indexReader.maxDoc(); i++) {
-			boolean withinRange = true;
+			boolean isWithinRange = true;
 			if (liveDocs != null && !liveDocs.get(i)) {
 				continue;
 			}
@@ -956,29 +956,40 @@ public class Index {
 			Document doc = indexReader.document(i);
 			long docID = idmap[i];
 			String valuesStr = doc.get(fieldname2);
-			String[] values = valuesStr.split(" ");
-			for (int j = 0; j <values.length ; j++) {
+			String[] values_str = valuesStr.split(" ");
+			long[] values_long = preprocessValues(values_str, queryVector.binary_value_range_length);
+			for (int j = 0; j <queryVector.dim_range ; j++) {
 				try {
-					long value_long = Long.valueOf(values[j]);
-					long value = DataProcessor.getValue(value_long, rangeQlist1.get(0).binary_value_range_length * rangeQlist1.get(0).num_combination);
-					if ((value <= rangeQlist1.get(j).getDimValue() && value >= rangeQlist2
-							.get(j).getDimValue())
-							|| (value >= rangeQlist1.get(j).getDimValue() && value <= rangeQlist2
-									.get(j).getDimValue())) {
+					
+					long query_value = queryVector.getValueAt(j);
+					int query_range = queryVector.getRangeAt(j);
+					if (values_long[j] <= query_value + query_range && 
+							values_long[j] >= query_value - query_range) {
 						// Pass this dimension and continue
 					} else {
-						withinRange = false;
+						isWithinRange = false;
 						break;
 					}
+					
 				} catch (NumberFormatException e) {
 					System.out.println("NumberforamtException: docID " + docID
-							+ " dim " + j + " value: " + values[j]);
+							+ " dim " + j + " value: " + values_long[j]);
 				}
 			}
-			//if(i % 10 ==0)
-				//System.out.println(i+"\t"+Long.valueOf(values[0])+"\t"+rangeQlist1.get(i%128).getDimValue());
-			if (withinRange) {
-				result.indexList.add(docID);
+			
+			
+//			if(i % 100 ==0)
+//				System.out.println(i+"\t"+DataProcessor.getValue(Long.valueOf(values[2]), queryVector.binary_value_range_length)+"\t"+queryVector.getValueAt(i%128));
+			if (isWithinRange) {
+				long dist = queryVector.calcDistance(values_long, aggregationFuction);
+
+				if(test)
+				{
+					System.out.println(i+" "+dist);
+				}
+				
+				if(dist < queryVector.theta)
+					result.indexSet.add(docID);
 			}
 		}
 		System.out.println("Finish range query in this node");
@@ -989,7 +1000,7 @@ public class Index {
 					+ Index.scan_searching_time);
 			System.out.println("Scan iterates through " + indexReader.maxDoc()
 					+ " and liveDocs " + liveDocsTotal);
-			System.out.println("Totally found:\t"+result.indexList.size()+" nodes");
+			System.out.println("Totally found:\t"+result.indexSet.size()+" nodes");
 			if (Index.num_query == 128) {
 				Index.num_query = 0;
 				Index.scan_searching_time = 0;
@@ -999,6 +1010,16 @@ public class Index {
 		return result;
 	}
 
+	private long[] preprocessValues(String[] values_str, int binary_value_range_length) {
+		long[] values_long = new long[values_str.length];
+		for(int i = 0; i < values_str.length; i++) {
+			long value_tmp = Long.valueOf(values_str[i]);
+			long value_long = DataProcessor.getValue(value_tmp, binary_value_range_length);
+			values_long[i] = value_long;
+		}			
+		return values_long;
+	}
+	
 	/**
 	 * search for different kinds of data
 	 * 

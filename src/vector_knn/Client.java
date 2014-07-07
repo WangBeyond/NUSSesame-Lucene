@@ -11,8 +11,10 @@ import java.util.Random;
 import jclient.JClient;
 import jmaster.FunctionHandler;
 import tool.DataProcessor;
+import tool.SIFTAggregation;
 import lucene.Index;
 import lucene.QueryConfig;
+import lucene.QueryVector;
 import lucene.ReturnValue;
 
 public class Client {
@@ -20,8 +22,6 @@ public class Client {
 	public static boolean debug = true;
 	public static int NUM_DIM = 128;
 	public static int COMBINE_DIM = 1;
-	//Two vectors for each range query
-	public static int RANGE_QUERY_NUM = 2;
 	public static int K = 1;
 
 	private JClient jclient;
@@ -166,29 +166,30 @@ public class Client {
 			qid++;
 			int dim_range= 128 / COMBINE_DIM;
 			long value_range = 255;
-			SIFTConfig twoConfigs[][] = new SIFTConfig[2][dim_range];
-			for(int i = 0; i < RANGE_QUERY_NUM; i++) {
-				SIFTConfig config[] = twoConfigs[i];
-				String values[] = line.split(" ");
-				//maximum number of range and value
-				for(int j = 0; j < dim_range; j++) {
-					//initialize a query configuration, set query id
-					config[j] = new SIFTConfig(qid);
-					//set the domain
-					config[j].setDimValueRange(dim_range, value_range);
-					//Does not support dimension combination
-					int combine_values[] = new int[1];
-					combine_values[0] = Integer.valueOf(values[j]);
-					//set query
-					config[j].setQuerylong(j, combine_values);	
-				}
-				line = buf.readLine();
+			QueryVector queryVector = new QueryVector(dim_range);
+			queryVector.setValueRange(value_range);
+			queryVector.p = 2;
+			queryVector.theta = 100;
+			
+			String values[] = line.split(" ");
+			for (int i = 0; i < NUM_DIM; i++) {
+				queryVector.setValue(i, Long.valueOf(values[i]));
+			}
+			line = buf.readLine();
+			String ranges[] = line.split(" ");
+			for (int i = 0; i < NUM_DIM; i++) {
+				queryVector.setRange(i, Integer.valueOf(ranges[i]));
+			}
+			line = buf.readLine();
+			String weights[] = line.split(" ");
+			for (int i = 0; i < NUM_DIM; i++) {
+				queryVector.setWeight(i, Float.valueOf(weights[i]));
 			}
 
 			jclient.initAllServers(Index.RANGE_QUERY, vec_index);
 			System.out.println("range querying...");
 			long startTime = System.currentTimeMillis();
-			long[] indexList = jclient.rangeQuery(twoConfigs[0], twoConfigs[1]);
+			long[] indexList = jclient.rangeQuery(queryVector);
 			long endTime = System.currentTimeMillis();
 			averTime += (endTime - startTime);
 			System.out.println("Found "+indexList.length+" vectors:");

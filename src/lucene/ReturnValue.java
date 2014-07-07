@@ -29,7 +29,7 @@ public class ReturnValue implements Serializable{
 	//to calculate the bound
 	public float min_dis, max_dis;
 	//contain all the vector indices for range query
-	public List<Long> indexList;
+	public Set<Long> indexSet;
 	
 	public ReturnValue () {
 		
@@ -43,7 +43,7 @@ public class ReturnValue implements Serializable{
 		this.topk_index = new ArrayList<Long>();
 		this.topk_list = new ArrayList<String>();
 		
-		this.indexList = new ArrayList<Long>();
+		this.indexSet = new HashSet<Long>();
 	}
 	
 	public List<Map.Entry<Long, float[]>> sortedOncount() {
@@ -135,12 +135,9 @@ public class ReturnValue implements Serializable{
 		}
 		
 		//merge the range query index results
-		Set<Long> indexSet = new HashSet<Long>(this.indexList);
-		for(int i = 0; i < value.indexList.size(); i++) {
-			indexSet.add(value.indexList.get(i));
+		for(Long index : value.indexSet) {
+			this.indexSet.add(index);
 		}
-		this.indexList.clear();
-		this.indexList.addAll(indexSet);
 	}
 	
 	public void merge(ReturnValue value) {

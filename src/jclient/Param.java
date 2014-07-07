@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lucene.QueryConfig;
+import lucene.QueryVector;
 
 /**
  * This class will be used by application to call the functions in master node
@@ -50,8 +51,7 @@ public class Param implements Serializable{
 	public int param_int_value_bi_length = -1;
 	//query
 	public QueryConfig[] qconfig = null;
-	public QueryConfig[] qconfig1 = null;
-	public QueryConfig[] qconfig2 = null;
+	public QueryVector query_vector = null;
 	public int param_int_topK = -1;
 	public float param_min_lowerbound = Float.MIN_VALUE; 
 	
