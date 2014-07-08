@@ -935,7 +935,7 @@ public class Index {
 		return revalue;
 	}
 
-	public ReturnValue rangeQuery(QueryVector queryVector, Aggregation aggregationFuction)
+	public ReturnValue rangeQuery(QueryVector queryVector)
 			throws Throwable {
 		long start = 0;
 		int liveDocsTotal = 0;
@@ -959,14 +959,17 @@ public class Index {
 			String[] values_str = valuesStr.split(" ");
 			long[] values_long = preprocessValues(values_str, queryVector.binary_value_range_length);
 			for (int j = 0; j <queryVector.dim_range ; j++) {
+				
 				try {
-					
 					long query_value = queryVector.getValueAt(j);
 					int query_range = queryVector.getRangeAt(j);
 					if (values_long[j] <= query_value + query_range && 
 							values_long[j] >= query_value - query_range) {
 						// Pass this dimension and continue
 					} else {
+//						if(docID == 111459 || docID==128298 ||docID==66684) {
+//							System.out.println(docID+" "+values_long[j]+" "+query_value+" "+query_range);
+//						}
 						isWithinRange = false;
 						break;
 					}
@@ -977,11 +980,11 @@ public class Index {
 				}
 			}
 			
-			
+			Aggregation aggregationFunction = new SIFTAggregation();
 //			if(i % 100 ==0)
 //				System.out.println(i+"\t"+DataProcessor.getValue(Long.valueOf(values[2]), queryVector.binary_value_range_length)+"\t"+queryVector.getValueAt(i%128));
 			if (isWithinRange) {
-				long dist = queryVector.calcDistance(values_long, aggregationFuction);
+				long dist = queryVector.calcDistance(values_long, aggregationFunction);
 
 				if(test)
 				{

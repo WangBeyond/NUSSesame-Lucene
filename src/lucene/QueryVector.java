@@ -25,7 +25,7 @@ public class QueryVector implements Serializable {
 	}
 	
 	public long calcDistance(long[] values, Aggregation aggregation) {
-		return aggregation.calcDistance(valueVector, values, p);
+		return aggregation.calcDistance(valueVector, values);
 	}
 	
 	public void setValueRange (long valueRange) {
