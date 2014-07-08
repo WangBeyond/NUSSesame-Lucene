@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.commons.io.EndianUtils;
 import org.apache.lucene.analysis.Analyzer;
@@ -61,6 +62,7 @@ import org.apache.lucene.util.Version;
 import tool.Aggregation;
 import tool.DataProcessor;
 import tool.SIFTAggregation;
+import vector_knn.SIFTConfig;
 
 /**
  * building the inverted with the interface of Lucene scanning the inverted list
@@ -71,7 +73,7 @@ import tool.SIFTAggregation;
 public class Index {
 
 	// for debug
-	static boolean debug = true;
+	static boolean debug = false;
 
 	// for testing
 	static boolean test = true;
@@ -383,34 +385,6 @@ public class Index {
 
 	}
 
-	public void init_rangequery() throws Throwable {
-		long start = System.currentTimeMillis();
-
-		if (indexReader != null)
-			indexReader.close();
-		if (areader != null)
-			areader.close();
-
-		indexReader = DirectoryReader.open(MMapDirectory.open(indexFile));
-		// change the reader
-		areader = SlowCompositeReaderWrapper.wrap(indexReader);
-
-		// The index for datafield (markfield)
-		// map the lucene id and doc id
-		idmap = new long[indexReader.maxDoc()];
-		Term term = new Term(this.fieldname3, "ID");
-		DocsAndPositionsEnum dp = areader.termPositionsEnum(term);
-		int lucene_id = -1, doc_id = -1;
-		BytesRef buf = new BytesRef();
-		while ((lucene_id = dp.nextDoc()) != DocsAndPositionsEnum.NO_MORE_DOCS) {
-			dp.nextPosition();
-			buf = dp.getPayload();
-			doc_id = PayloadHelper.decodeInt(buf.bytes, buf.offset);
-			idmap[lucene_id] = doc_id;
-		}
-		System.out.println("Range query initialization done! Time:\t"
-				+ (System.currentTimeMillis() - start) + " ms");
-	}
 
 	/**
 	 * search for different kinds of data
@@ -455,6 +429,9 @@ public class Index {
 		return revalue;
 	}
 
+	
+	
+	
 	/**
 	 * To lower the remote function calling cost, the salve node handle a batch
 	 * of every time
@@ -518,9 +495,62 @@ public class Index {
 						.get(i).getKey())));
 			}
 		}
+		
 		return result;
 	}
 
+	
+	/**
+	 * rangeSearch is similar to vector search in generalSearch but it only
+	 * conducts the first iteration
+	 * */
+	public ReturnValue rangeSearch(List<QueryConfig> qlist) throws Throwable {
+		
+		ReturnValue result = new ReturnValue();
+		double theta = qlist.get(0).theta;
+		double pValue = ((SIFTConfig)qlist.get(0)).pValue;
+		
+		// if we search the vector 
+		if (qlist.get(0).getType() == QueryConfig.VECTOR) {
+			
+			//range query to get candidates and do intersection
+			NUM_COMBINATION = qlist.get(0).num_combination;
+			DIM_RANGE = qlist.get(0).getDimRange();
+			result = generalSearch(qlist.get(0));
+			for (int i = 1; i < qlist.size(); i++) {
+				result.intersect(generalSearch(qlist.get(i)));
+			}
+
+			result.normalizeDist(pValue);
+
+			//Verify the candidates with theta value
+			Set<Long> indexSet = result.table.keySet();
+			List<Long> delList = new ArrayList<Long>();
+			for (Long index : indexSet) {
+				float distance = result.table.get(index)[1];
+				if (distance > theta) {
+					delList.add(index);
+				}
+			}
+			//Use delList to store the indices to delete first, avoiding the java.util.ConcurrentModificationException 
+			for (Long index : delList) {
+				result.table.remove(index);
+			}
+			
+			if(test) {
+				indexSet = result.table.keySet();
+				System.out.println("Found "+indexSet.size()+" features");
+				for (Long index : indexSet) {
+					float distance = result.table.get(index)[1];
+					System.out.println(index+"\t"+distance);
+				}
+			}
+		}
+		
+		return result;
+	}
+	
+	
 	/**
 	 * calculate the bounds and get candidates
 	 * */
@@ -935,91 +965,7 @@ public class Index {
 		return revalue;
 	}
 
-	public ReturnValue rangeQuery(QueryVector queryVector, Aggregation aggregationFuction)
-			throws Throwable {
-		long start = 0;
-		int liveDocsTotal = 0;
-		if (test) {
-			Index.num_query++;
-			start = System.currentTimeMillis();
-		}
-		ReturnValue result = new ReturnValue();
-		Bits liveDocs = MultiFields.getLiveDocs(indexReader);
 
-		// start scan search through all the values
-		for (int i = 0; i < indexReader.maxDoc(); i++) {
-			boolean isWithinRange = true;
-			if (liveDocs != null && !liveDocs.get(i)) {
-				continue;
-			}
-			liveDocsTotal++;
-			Document doc = indexReader.document(i);
-			long docID = idmap[i];
-			String valuesStr = doc.get(fieldname2);
-			String[] values_str = valuesStr.split(" ");
-			long[] values_long = preprocessValues(values_str, queryVector.binary_value_range_length);
-			for (int j = 0; j <queryVector.dim_range ; j++) {
-				try {
-					
-					long query_value = queryVector.getValueAt(j);
-					int query_range = queryVector.getRangeAt(j);
-					if (values_long[j] <= query_value + query_range && 
-							values_long[j] >= query_value - query_range) {
-						// Pass this dimension and continue
-					} else {
-						isWithinRange = false;
-						break;
-					}
-					
-				} catch (NumberFormatException e) {
-					System.out.println("NumberforamtException: docID " + docID
-							+ " dim " + j + " value: " + values_long[j]);
-				}
-			}
-			
-			
-//			if(i % 100 ==0)
-//				System.out.println(i+"\t"+DataProcessor.getValue(Long.valueOf(values[2]), queryVector.binary_value_range_length)+"\t"+queryVector.getValueAt(i%128));
-			if (isWithinRange) {
-				long dist = queryVector.calcDistance(values_long, aggregationFuction);
-
-				if(test)
-				{
-					System.out.println(i+" "+dist);
-				}
-				
-				if(dist < queryVector.theta)
-					result.indexSet.add(docID);
-			}
-		}
-		System.out.println("Finish range query in this node");
-
-		if (test) {
-			Index.scan_searching_time += (System.currentTimeMillis() - start);
-			System.out.println("Scan searching time:\t"
-					+ Index.scan_searching_time);
-			System.out.println("Scan iterates through " + indexReader.maxDoc()
-					+ " and liveDocs " + liveDocsTotal);
-			System.out.println("Totally found:\t"+result.indexSet.size()+" nodes");
-			if (Index.num_query == 128) {
-				Index.num_query = 0;
-				Index.scan_searching_time = 0;
-			}
-		}
-
-		return result;
-	}
-
-	private long[] preprocessValues(String[] values_str, int binary_value_range_length) {
-		long[] values_long = new long[values_str.length];
-		for(int i = 0; i < values_str.length; i++) {
-			long value_tmp = Long.valueOf(values_str[i]);
-			long value_long = DataProcessor.getValue(value_tmp, binary_value_range_length);
-			values_long[i] = value_long;
-		}			
-		return values_long;
-	}
-	
 	/**
 	 * search for different kinds of data
 	 * 

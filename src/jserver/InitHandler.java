@@ -42,7 +42,7 @@ public class InitHandler implements ServerInvocationHandler{
 		} else if(type == Index.VECTOR_SCAN) {
 			index.init_scan();
 		} else if(type == Index.RANGE_QUERY) {
-			index.init_rangequery();
+			index.init_query();		
 		}else {
 			System.out.println("Initialization error: invalid invocation type");
 		}

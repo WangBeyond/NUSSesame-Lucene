@@ -14,7 +14,6 @@ import tool.DataProcessor;
 import tool.SIFTAggregation;
 import lucene.Index;
 import lucene.QueryConfig;
-import lucene.QueryVector;
 import lucene.ReturnValue;
 
 public class Client {
@@ -155,53 +154,82 @@ public class Client {
 	}
 	
 
-	int testRangeQuery() throws Throwable {
+	public void testRangeQuery() throws Throwable {
+		
+		COMBINE_DIM = 1;
+		//first, connect servers.
 		jclient.connectAllServers(vec_index);
+		
+		//create the QueryConfig for each dimension
 		BufferedReader buf = new BufferedReader(new InputStreamReader(new FileInputStream("data/rangequery.txt")));
-		String line = "";	
+		String line = "";
 		int qid = 0;
-		int distance = -1;
-		long averTime = 0;
+		long avergetime = 0;
 		while((line = buf.readLine()) != null) {
 			qid++;
-			int dim_range= 128 / COMBINE_DIM;
-			long value_range = 255;
-			QueryVector queryVector = new QueryVector(dim_range);
-			queryVector.setValueRange(value_range);
-			queryVector.p = 2;
-			queryVector.theta = 100;
-			
+
 			String values[] = line.split(" ");
-			for (int i = 0; i < NUM_DIM; i++) {
-				queryVector.setValue(i, Long.valueOf(values[i]));
-			}
 			line = buf.readLine();
 			String ranges[] = line.split(" ");
-			for (int i = 0; i < NUM_DIM; i++) {
-				queryVector.setRange(i, Integer.valueOf(ranges[i]));
-			}
 			line = buf.readLine();
 			String weights[] = line.split(" ");
-			for (int i = 0; i < NUM_DIM; i++) {
-				queryVector.setWeight(i, Float.valueOf(weights[i]));
+			
+			//maximum number of range and value
+			int dim_range= 128 / COMBINE_DIM;
+			long value_range = 255;
+			SIFTConfig config[] = new SIFTConfig[dim_range];
+			for(int i = 0; i < dim_range; i++) {
+				//initialize a query configuration, set query id
+				config[i] = new SIFTConfig(qid);
+				//set the domain
+				config[i].setDimValueRange(dim_range, value_range);
+				//combine the values and reduce the dimension if necessary
+				int combine_values[] = new int[COMBINE_DIM];
+				for(int j = 0; j < COMBINE_DIM; j++) {
+					combine_values[j] = Integer.valueOf(values[i * COMBINE_DIM + j]);
+				}
+				config[i].num_combination = COMBINE_DIM;
+				//set query 
+				config[i].setQuerylong(i, combine_values);
+				
+				//set bi-direction search range
+				int range = Integer.valueOf(ranges[i]);
+				config[i].setRange(range, range);	
+				
+//				float weight = Float.valueOf(weights[i]);
+//				config[i].weight = weight;
+				
+				//set theta value in search
+				config[i].theta = 1500;
 			}
-
+			
+			
+			/*
+			 * this part need more modifications
+			 * **/ 
+			//randomly pick some data and calculate a bound
+//			int bound = scan_topK_search();
+			//set bound for searching
+//			jclient.setBound((float)bound);
+			
+			//init the servers before searching
 			jclient.initAllServers(Index.RANGE_QUERY, vec_index);
+			//searching
+			long starttime, endtime;
 			System.out.println("range querying...");
-			long startTime = System.currentTimeMillis();
-			long[] indexList = jclient.rangeQuery(queryVector);
-			long endTime = System.currentTimeMillis();
-			averTime += (endTime - startTime);
-			System.out.println("Found "+indexList.length+" vectors:");
-			for(int i = 0; i < indexList.length; i++) {
-				System.out.println(indexList[i]);
+			starttime = System.currentTimeMillis();
+			long index[] = jclient.rangeQuery(config);
+			endtime = System.currentTimeMillis();
+			avergetime += (endtime - starttime);
+			
+			//display the results
+			for(int i = 0; i < index.length; i++) {
+				System.out.println(index[i]);
 			}
-			System.out.println("scanning time: "+(endTime-startTime)+" ms");
+			System.out.println("totally found "+index.length+" features");
+			System.out.println("seraching time: "+(endtime - starttime)+" ms");
 		}
-
-		System.out.println("avg time:\t"+averTime/qid);
-
-		return distance;
+		System.out.println("average searching time: "+ avergetime/qid+" ms");
 	}
 	
 	int scan_topK_search() throws Throwable {
@@ -333,7 +361,7 @@ public class Client {
 		Client c = new Client("socket://127.0.0.1:8888");
 //		Client c = new Client("socket://137.132.145.132:8888");
 		vec_num = 250000;
-		nodes_num = 1;
+		nodes_num = 8;
 		vec_index = "Index_"+nodes_num+"_"+vec_num;
 		vec_scanfile = "Scanfile_"+nodes_num+"_"+vec_num+".bin";
 //		
@@ -352,28 +380,7 @@ public class Client {
 	}
 }
 
-class SIFTConfig extends QueryConfig {
-	
-	public SIFTConfig(int id) {
-		super(id);
-		// TODO Auto-generated constructor stub
-	}
 
-	@Override
-	public float calcDistance(long a, long b) {
-		// TODO Auto-generated method stub
-		return (a - b) * (a - b);
-		//L1
-		//return Math.abs(a - b);
-	}
-
-	@Override
-	public int getType() {
-		// TODO Auto-generated method stub
-		return QueryConfig.VECTOR;
-	}
-	
-}
 
 class scanComparator implements Comparator<Combo>{
 

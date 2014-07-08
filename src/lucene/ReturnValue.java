@@ -133,15 +133,57 @@ public class ReturnValue implements Serializable{
 			this.topk_index.add(value.topk_index.get(i));
 			this.topk_list.add(value.topk_list.get(i));
 		}
-		
-		//merge the range query index results
-		for(Long index : value.indexSet) {
-			this.indexSet.add(index);
-		}
 	}
+	
+
 	
 	public void merge(ReturnValue value) {
 		merge(value, 1.0);
+	}
+	
+	
+	public void intersect(ReturnValue value, double weight) {
+		if(value == null)
+			return;
+		
+		//merge the hash map
+		List<Map.Entry<Long, float[]>> infoIds = 
+		    new ArrayList<Map.Entry<Long, float[]>>(this.table.entrySet());
+		
+		for(int i = 0; i < infoIds.size(); i++) {
+			long key = infoIds.get(i).getKey();
+			if(value.table.containsKey(key)) {	
+	
+				float count_dis1[] = this.table.get(key);
+				float count_dis2[] = value.table.get(key);
+				
+				//add the count
+				count_dis1[0] += (count_dis2[0] * weight);
+				//add the distance
+				count_dis1[1] += (count_dis2[1] * weight);
+				this.table.put(key, count_dis1);	
+				
+
+			} else {
+				this.table.remove(key);
+			}
+		}
+	}
+	
+	public void normalizeDist(double pValue) {
+		List<Map.Entry<Long, float[]>> infoIds = 
+		    new ArrayList<Map.Entry<Long, float[]>>(this.table.entrySet());
+		
+		for(int i = 0; i < infoIds.size(); i++) {
+			Long key = infoIds.get(i).getKey();
+			float count_dis[] = this.table.get(key);
+			count_dis[1] = (float)Math.pow(count_dis[1], 1/pValue);
+			this.table.put(key, count_dis);						
+		}
+	}
+	
+	public void intersect(ReturnValue value) {
+		intersect(value, 1.0);
 	}
 }
 

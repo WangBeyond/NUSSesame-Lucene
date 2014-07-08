@@ -4,7 +4,6 @@ import java.net.MalformedURLException;
 
 import lucene.Index;
 import lucene.QueryConfig;
-import lucene.QueryVector;
 import lucene.ReturnValue;
 
 import org.jboss.remoting.Client;
@@ -229,10 +228,10 @@ public class JClient {
 		return (ReturnValue) callMasterFunction(parameters);
 	}
 	
-	public long[] rangeQuery(QueryVector queryVector) {
+	public long[] rangeQuery(QueryConfig config[]) {
 		
 		parameters.function_type = Param.FUNCTION_TYPE.rangeQuery;
-		parameters.query_vector = queryVector;
+		parameters.qconfig = config;
 		return (long[]) callMasterFunction(parameters);
 		
 	}

@@ -10,8 +10,6 @@ public class FileProcessor {
     public static final int NUMBER_OF_DIMENSIONS = 128;
     public static final int NUMBER_OF_VALUES_PER_DIM = 256;
     public static final int RANGE_RANGE = 40;
-
-    
     
     public static int[] generateValueVector() {
     	Random rand = new Random();
@@ -22,14 +20,42 @@ public class FileProcessor {
     	return vector;
     }
     
-    public static int[] generateRangeVector() {
-    	Random rand = new Random();
-    	int[] vector = new int[NUMBER_OF_DIMENSIONS];
-    	for (int i = 0; i < NUMBER_OF_DIMENSIONS; i++) {
-    		vector[i] = rand.nextInt(40);
-    	}
-    	return vector;
+    public static int[] generateRangeVectorRandomly() {
+    	return generateRangeVector(NUMBER_OF_DIMENSIONS);
     }
+    
+    public static int[] generateRangeVector(int randDimNum) {
+    	if (randDimNum >NUMBER_OF_DIMENSIONS) {
+        	Random rand = new Random();
+        	int[] vector = new int[NUMBER_OF_DIMENSIONS];
+        	for (int i = 0; i < randDimNum; i++) {
+        		vector[i] = rand.nextInt(40);
+        	}
+        	for (int i = randDimNum; i < NUMBER_OF_DIMENSIONS; i++) {
+        		vector[i] = NUMBER_OF_VALUES_PER_DIM;
+        	}
+        	return vector;
+    	} else {
+    		throw new InvalidParameterException("parameter is over dimension range: "+randDimNum);
+    	}
+    }
+    
+    public static int[] generateRangeVector(int randDimNum, int defaultRange) {
+    	if (randDimNum <= NUMBER_OF_DIMENSIONS) {
+        	Random rand = new Random();
+        	int[] vector = new int[NUMBER_OF_DIMENSIONS];
+        	for (int i = 0; i < randDimNum; i++) {
+        		vector[i] = defaultRange;
+        	}
+        	for (int i = randDimNum; i < NUMBER_OF_DIMENSIONS; i++) {
+        		vector[i] = NUMBER_OF_VALUES_PER_DIM;
+        	}
+        	return vector;
+    	} else {
+    		throw new InvalidParameterException("parameter is over dimension range: "+randDimNum);
+    	}
+    }
+    
     
     public static float[] generateWeightVector() {
     	Random rand = new Random();
@@ -50,7 +76,7 @@ public class FileProcessor {
     	for (int i = 0; i < vectorNum; i++) {
         	StringBuffer strbuf = new StringBuffer();
         	int[] valueVector = generateValueVector();
-        	int[] rangeVector = generateRangeVector();
+        	int[] rangeVector = generateRangeVector(5,100);
         	float[] weightVector = generateWeightVector();
         	
         	//append the three vectors to the string buffer

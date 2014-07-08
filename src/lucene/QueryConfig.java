@@ -16,11 +16,14 @@ public abstract class QueryConfig implements Serializable{
 	public boolean needRestart;
 	//for aggregation function
 	public double weight = 1.0;
+	//p value
+	public double theta = -1;
 	//dimension reduction
 	public int num_combination = 1;
 	//the type of application
 	public static int STRING = 0;
 	public static int VECTOR = 1;
+	public static int RANGEQUERY = 2;
 
 	//for string search
 	private String querystr = null;

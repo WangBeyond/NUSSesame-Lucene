@@ -9,7 +9,6 @@ import kv.*;
 
 import lucene.Index;
 import lucene.QueryConfig;
-import lucene.QueryVector;
 
 import org.jboss.remoting.InvocationRequest;
 import org.jboss.remoting.ServerInvocationHandler;
@@ -36,15 +35,14 @@ public class QueryHandler implements ServerInvocationHandler {
 	public Object invoke(InvocationRequest arg) throws Throwable {
 
 		// TODO Auto-generated method stub	
-		try {
-			@SuppressWarnings("unchecked")
-			List<QueryConfig> qlist = (List<QueryConfig>) arg.getParameter();
+		@SuppressWarnings("unchecked")
+		List<QueryConfig> qlist = (List<QueryConfig>) arg.getParameter();
+		if(qlist.get(0).theta == -1) {
 			return index.generalSearch(qlist);
-		} catch(ClassCastException e) {
-			@SuppressWarnings("unchecked")
-			QueryVector queryVector = (QueryVector) arg.getParameter();
-			return index.rangeQuery(queryVector);
+		} else {
+			return index.rangeSearch(qlist);
 		}
+
 	}
 
 	@Override
