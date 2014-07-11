@@ -260,18 +260,133 @@ public class DataProcessor {
 		}
 	}
 	
+	
+	public static void getMinMaxLSH(int radius, int dim_range, int num_lines, int round) {
+		
+		double[][] lower_bound = new double[num_lines][dim_range];
+		double[][] upper_bound = new double[num_lines][dim_range];
+		
+		for(int j = 0; j < num_lines; j++) {
+			
+			//get vector a with normal distribution and b with uniform distribution
+			Random rand = new Random();
+			double[] vector_a = new double[dim_range];
+			for(int k = 0; k < vector_a.length; k++) {
+				vector_a[k] = ((double)(k+1)%15)/10;
+				//vector_a[k] = rand.nextGaussian();
+			}
+			int b = rand.nextInt(radius);
+			//int b = radius/2;
+			
+			for(int k = 0; k < dim_range; k++) {
+				
+				//get the intersection between hyper plane and the line
+				double right_plane = (radius - b)/vector_a[k];
+				double left_plane = -b/vector_a[k];
+				
+				upper_bound[j][k] = radius;
+				lower_bound[j][k] = -radius;
+				
+				//as for right_plane
+				double norm_a_square = norm_square(vector_a);
+				double numerator = radius * radius - (radius-b) * (radius-b)/norm_a_square;
+				//double denominator = (radius-b)*(radius-b)/(vector_a[k]*vector_a[k]) - (radius-b)*(radius-b)/norm_a_square;
+				double denominator = (radius-b)*(radius-b)*((norm_a_square-vector_a[k]*vector_a[k])/(vector_a[k]*vector_a[k]*norm_a_square));
+
+				double temp = numerator / denominator;
+				double m_pos = Math.sqrt(temp) + 1;
+				double m_neg = -Math.sqrt(temp) + 1;
+				double bound1 = m_pos*vector_a[k]*(radius-b)/norm_a_square - (m_pos-1)*(radius-b)/vector_a[k];
+				double bound2 = m_neg*vector_a[k]*(radius-b)/norm_a_square - (m_neg-1)*(radius-b)/vector_a[k];
+				
+				//right_plane is between right radius and origin 
+				if(right_plane < radius && right_plane >= 0) {
+					System.out.println("1");
+					upper_bound[j][k] = Math.max(bound1, bound2);
+				}
+				//right plane is between origin and left radius
+				else if(right_plane > -radius && right_plane <= 0) {
+					System.out.println("2");
+					lower_bound[j][k] = Math.min(bound1, bound2);
+				}
+				
+				//as for left plane 
+				numerator = radius * radius - (-b) * (-b)/norm_a_square;
+				denominator = (-b)*(-b)*((norm_a_square-vector_a[k]*vector_a[k])/(vector_a[k]*vector_a[k]*norm_a_square));
+
+				//denominator = (-b)*(-b)/(vector_a[k]*vector_a[k]) - (-b)*(-b)/norm_a_square;
+				temp = numerator / denominator;
+				m_pos = Math.sqrt(temp) + 1;
+				m_neg = -Math.sqrt(temp) + 1;				
+		        bound1 = m_pos*vector_a[k]*(-b)/norm_a_square - (m_pos-1)*(-b)/vector_a[k];
+				bound2 = m_neg*vector_a[k]*(-b)/norm_a_square - (m_neg-1)*(-b)/vector_a[k];
+				//left_plane is between origin and left radius
+				if(left_plane > -radius && left_plane <= 0) {
+					System.out.println("3");
+					lower_bound[j][k] = Math.min(bound1, bound2);
+				}
+				//left_plane is between right radius and origin
+				else if(left_plane < radius && left_plane >= 0) {
+					System.out.println("4");
+					upper_bound[j][k] = Math.max(bound1, bound2);
+				}
+				System.out.println(bound1+" "+bound2+" "+upper_bound[j][k]+" "+lower_bound[j][k]);
+			}//end of this dim
+			
+		}//end of this line
+		
+		double[] max_dim = new double[dim_range];
+		double[] min_dim = new double[dim_range];
+		double minimum_interval = 2*radius;
+		
+		//get the minimum values in the upperbounds for the given dimension
+		for (int n = 0; n < dim_range; n++) {
+			max_dim[n] = upper_bound[0][n];
+			for (int m = 0; m < num_lines; m++) {
+				if (max_dim[n] > upper_bound[m][n]) {
+					max_dim[n] = upper_bound[m][n];
+				}
+			}
+			
+			min_dim[n] = lower_bound[0][n];
+			for (int m = 1; m < num_lines; m++) {
+				if (min_dim[n] < lower_bound[m][n]) {
+					min_dim[n] = lower_bound[m][n];
+				}
+			}
+			if (max_dim[n] - min_dim[n] < minimum_interval) {
+				minimum_interval = max_dim[n] - min_dim[n];
+			}		
+		}
+		if(debug) {  
+			System.out.println("min: "+min_dim[7]+"\tmax: "+max_dim[7]+"\tmin interval: "+minimum_interval);
+		}
+
+
+	}
+	
+	
+	private static double norm_square(double[] vector) {
+		double norm_square = 0;
+		for(int i = 0; i < vector.length; i++) {
+			norm_square += vector[i] * vector[i];
+		}
+		return norm_square;
+	}
+	
 	/**
 	 * test the functions
 	 * */
 	public static void main (String a[]) throws Throwable {
 	
-//		debug = true;
+		debug = true;
 //		int test[] = new int[4];
 //		test[0] = 2;
 //		test[1] = 3;
 //		test[2] = 10;
 //		test[3] = 100;
 //		combineSiftValues(test,4,4);
-		createTestSift(100);
+//		createTestSift(100);
+		getMinMaxLSH(10, 128, 1, 1);
 	}
 }

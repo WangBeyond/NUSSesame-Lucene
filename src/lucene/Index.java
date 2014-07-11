@@ -59,9 +59,7 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.NumericUtils;
 import org.apache.lucene.util.Version;
 
-import tool.Aggregation;
 import tool.DataProcessor;
-import tool.SIFTAggregation;
 import vector_knn.SIFTConfig;
 
 /**

@@ -11,7 +11,6 @@ import java.util.Random;
 import jclient.JClient;
 import jmaster.FunctionHandler;
 import tool.DataProcessor;
-import tool.SIFTAggregation;
 import lucene.Index;
 import lucene.QueryConfig;
 import lucene.ReturnValue;
