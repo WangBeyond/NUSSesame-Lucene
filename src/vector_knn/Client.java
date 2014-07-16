@@ -22,6 +22,9 @@ public class Client {
 	public static int COMBINE_DIM = 1;
 	public static int K = 1;
 
+	public static final int MIN = 0;
+	public static final int MAX = 1;
+	
 	private JClient jclient;
 	private Reader reader;
 	
@@ -164,6 +167,8 @@ public class Client {
 		String line = "";
 		int qid = 0;
 		long avergetime = 0;
+		double theta = 50;
+		double pValue = 2;
 		while((line = buf.readLine()) != null) {
 			qid++;
 
@@ -176,6 +181,15 @@ public class Client {
 			//maximum number of range and value
 			int dim_range= 128 / COMBINE_DIM;
 			long value_range = 255;
+			
+			double[] weights_double = new double[NUM_DIM];
+			for(int i = 0; i < NUM_DIM; i++){
+				weights_double[i] = Double.valueOf(weights[i]);
+			}
+			double[][] min_max_ranges = DataProcessor.getMinMaxLSH(theta, 128, 2);
+			double[] min_range = convertToDataSpace(min_max_ranges[MIN], weights_double, pValue);
+			double[] max_range = convertToDataSpace(min_max_ranges[MAX], weights_double, pValue);
+			
 			SIFTConfig config[] = new SIFTConfig[dim_range];
 			for(int i = 0; i < dim_range; i++) {
 				//initialize a query configuration, set query id
@@ -192,24 +206,14 @@ public class Client {
 				config[i].setQuerylong(i, combine_values);
 				
 				//set bi-direction search range
-				int range = Integer.valueOf(ranges[i]);
-				config[i].setRange(range, range);	
+				//int range = Integer.valueOf(ranges[i]);
 				
-//				float weight = Float.valueOf(weights[i]);
-//				config[i].weight = weight;
+				config[i].setRange(Math.abs((int)Math.floor(min_range[i])), Math.abs((int)Math.ceil(max_range[i])));	
+				config[i].weight = weights_double[i];
 				
 				//set theta value in search
-				config[i].theta = 1500;
+				config[i].theta = theta;
 			}
-			
-			
-			/*
-			 * this part need more modifications
-			 * **/ 
-			//randomly pick some data and calculate a bound
-//			int bound = scan_topK_search();
-			//set bound for searching
-//			jclient.setBound((float)bound);
 			
 			//init the servers before searching
 			jclient.initAllServers(Index.RANGE_QUERY, vec_index);
@@ -229,6 +233,15 @@ public class Client {
 			System.out.println("seraching time: "+(endtime - starttime)+" ms");
 		}
 		System.out.println("average searching time: "+ avergetime/qid+" ms");
+	}
+	
+	private double[] convertToDataSpace(double[] rangesInWeightedSpace, double[] weights, double p) {
+		double[] rangesInDataSpace = new double[rangesInWeightedSpace.length];
+		for(int i = 0; i < rangesInWeightedSpace.length; i++) {
+			double u = Math.pow(weights[i], (double)1/p);
+			rangesInDataSpace[i] = rangesInWeightedSpace[i]/u;
+		}
+		return rangesInDataSpace;
 	}
 	
 	int scan_topK_search() throws Throwable {
@@ -260,6 +273,7 @@ public class Client {
 				//set top K
 				config[i].setK(K);
 			}
+			long startTimeBeforeInit = System.currentTimeMillis();
 			jclient.initAllServers(Index.VECTOR_SCAN, vec_scanfile);
 			System.out.println("scanning...");
 			long startTime = System.currentTimeMillis();
@@ -273,11 +287,12 @@ public class Client {
 				}
 				System.out.println(list.get(i).getKey()+"\t"+list.get(i).getValue()[1]);
 			}
-			System.out.println("scanning time: "+(endTime-startTime)+" ms");
+			System.out.println("init time:\t"+(startTime - startTimeBeforeInit)+" ms");
+			System.out.println("scanning time:\t"+(endTime-startTime)+" ms");
+			System.out.println("Total time (init+scan):\t"+(System.currentTimeMillis() - startTimeBeforeInit)+" ms");
 		}
-
+		
 		System.out.println("avg time:\t"+averTime/qid);
-
 		return distance;
 	}
 	
@@ -295,7 +310,7 @@ public class Client {
 			
 			jclient.addPairs(value_id[NUM_DIM], NUM_DIM, value_id, Index.SCAN_BUILD);
 			
-			if(i%10 == 0)
+			if(i%100 == 0)
 				System.out.println(i);
 		}
 		jclient.flush();
@@ -303,7 +318,6 @@ public class Client {
 		reader.closeReader();
 	}
 	
-	//randomly pick 5% of the original data in order to get a bound
 	int scan_topK_searchLocally() throws Throwable {
 		
 		BufferedReader buf = new BufferedReader(new InputStreamReader(new FileInputStream("data/query.txt")));
@@ -374,8 +388,8 @@ public class Client {
 //		System.out.println();
 		
 //		c.testTopKsearch();
-//		c.scan_topK_search();
-		c.testRangeQuery();
+		c.scan_topK_search();
+//		c.testRangeQuery();
 	}
 }
 

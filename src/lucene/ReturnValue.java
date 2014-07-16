@@ -149,7 +149,6 @@ public class ReturnValue implements Serializable{
 		//merge the hash map
 		List<Map.Entry<Long, float[]>> infoIds = 
 		    new ArrayList<Map.Entry<Long, float[]>>(this.table.entrySet());
-		
 		for(int i = 0; i < infoIds.size(); i++) {
 			long key = infoIds.get(i).getKey();
 			if(value.table.containsKey(key)) {	

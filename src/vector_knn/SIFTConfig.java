@@ -4,11 +4,17 @@ import lucene.QueryConfig;
 
 public class SIFTConfig extends QueryConfig {
 	
-	public double pValue = 2;
+	public double pValue;
 	
-	public SIFTConfig(int id) {
+	public SIFTConfig(int id, int pValue) {
 		super(id);
 		// TODO Auto-generated constructor stub
+		this.pValue = pValue;
+	}
+	
+	public SIFTConfig(int id){
+		super(id);
+		this.pValue = 2;
 	}
 
 	@Override

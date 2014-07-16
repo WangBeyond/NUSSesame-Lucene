@@ -296,7 +296,7 @@ public class Index {
 		binIn = new DataInputStream(new BufferedInputStream(
 				new FileInputStream(indexFile)));
 		vectorList = new ArrayList<int[]>();
-
+		long start = System.currentTimeMillis();
 		try {
 			while (true) {
 				// read int for sift feature
@@ -310,7 +310,8 @@ public class Index {
 				vectorList.add(value_id);
 			}
 		} catch (EOFException e) {
-			System.out.println("Finish read binary data file");
+			long initTime = System.currentTimeMillis() - start;
+			System.out.println("Finish read binary data file\t"+initTime+" ms");
 		}
 	}
 
@@ -514,9 +515,13 @@ public class Index {
 			//range query to get candidates and do intersection
 			NUM_COMBINATION = qlist.get(0).num_combination;
 			DIM_RANGE = qlist.get(0).getDimRange();
-			result = generalSearch(qlist.get(0));
+			System.out.println(result.table.keySet().size());
+			result.merge(generalSearch(qlist.get(0)), qlist.get(0).weight);
+			System.out.println(result.table.keySet().size());
+
 			for (int i = 1; i < qlist.size(); i++) {
-				result.intersect(generalSearch(qlist.get(i)));
+				result.intersect(generalSearch(qlist.get(i)),qlist.get(i).weight);
+				//System.out.println(result.table.keySet().size()+" "+248000+" "+result.table.get((long)248000)[1]);
 			}
 
 			result.normalizeDist(pValue);
@@ -524,17 +529,27 @@ public class Index {
 			//Verify the candidates with theta value
 			Set<Long> indexSet = result.table.keySet();
 			List<Long> delList = new ArrayList<Long>();
+
 			for (Long index : indexSet) {
+				if(index==248000)
+					System.out.println(index+" "+result.table.get(index)[1] +" "+getData(index));
 				float distance = result.table.get(index)[1];
+				//System.out.println(distance);
 				if (distance > theta) {
 					delList.add(index);
 				}
+			
 			}
+			if(test){
+				System.out.println("Found "+indexSet.size()+" candidates");
+			}
+
 			//Use delList to store the indices to delete first, avoiding the java.util.ConcurrentModificationException 
 			for (Long index : delList) {
 				result.table.remove(index);
 			}
 			
+
 			if(test) {
 				indexSet = result.table.keySet();
 				System.out.println("Found "+indexSet.size()+" features");
@@ -983,28 +998,29 @@ public class Index {
 				new scanComparator());
 		for (int i = 0; i < vectorList.size(); i++) {
 			int distance = 0;
+			boolean isCandidate = true;
 			int[] vector = vectorList.get(i);
 			long vectorId = (long) vector[DIM_RANGE];
 			for (int j = 0; j < DIM_RANGE; j++) {
 				distance += qlist.get(j).calcDistance(
 						qlist.get(j).getDimValue(), vector[j]);
+				if(pq.size() >= K && distance >= pq.peek().distance) {
+					isCandidate = false;
+					break;
+				}
 			}
 			if (pq.size() < K)
 				pq.add(new Combo(distance, vectorId));
-			else if (distance < pq.peek().distance) {
+			else if (isCandidate && distance < pq.peek().distance) {
 				pq.poll();
 				pq.add(new Combo(distance, vectorId));
 			}
 		}
 
 		if (test) {
-			Index.scan_searching_time += (System.currentTimeMillis() - start);
 			System.out.println("Scan searching time:\t"
-					+ Index.scan_searching_time);
-			if (Index.num_query == 128) {
-				Index.num_query = 0;
-				Index.scan_searching_time = 0;
-			}
+					+ (System.currentTimeMillis() - start));
+
 		}
 		System.out.println("Nearest vecotrIDs");
 		for (Combo combo : pq) {

@@ -261,7 +261,7 @@ public class DataProcessor {
 	}
 	
 	
-	public static void getMinMaxLSH(int radius, int dim_range, int num_lines, int round) {
+	public static double[][] getMinMaxLSH(double radius, int dim_range, int num_lines) {
 		
 		double[][] lower_bound = new double[num_lines][dim_range];
 		double[][] upper_bound = new double[num_lines][dim_range];
@@ -272,10 +272,10 @@ public class DataProcessor {
 			Random rand = new Random();
 			double[] vector_a = new double[dim_range];
 			for(int k = 0; k < vector_a.length; k++) {
-				vector_a[k] = ((double)(k+1)%15)/10;
-				//vector_a[k] = rand.nextGaussian();
+				//vector_a[k] = ((double)(k+1)%15)/10;
+				vector_a[k] = rand.nextGaussian();
 			}
-			int b = rand.nextInt(radius);
+			double b = rand.nextDouble()*radius;
 			//int b = radius/2;
 			
 			for(int k = 0; k < dim_range; k++) {
@@ -301,12 +301,10 @@ public class DataProcessor {
 				
 				//right_plane is between right radius and origin 
 				if(right_plane < radius && right_plane >= 0) {
-					System.out.println("1");
 					upper_bound[j][k] = Math.max(bound1, bound2);
 				}
 				//right plane is between origin and left radius
 				else if(right_plane > -radius && right_plane <= 0) {
-					System.out.println("2");
 					lower_bound[j][k] = Math.min(bound1, bound2);
 				}
 				
@@ -322,15 +320,13 @@ public class DataProcessor {
 				bound2 = m_neg*vector_a[k]*(-b)/norm_a_square - (m_neg-1)*(-b)/vector_a[k];
 				//left_plane is between origin and left radius
 				if(left_plane > -radius && left_plane <= 0) {
-					System.out.println("3");
 					lower_bound[j][k] = Math.min(bound1, bound2);
 				}
 				//left_plane is between right radius and origin
 				else if(left_plane < radius && left_plane >= 0) {
-					System.out.println("4");
 					upper_bound[j][k] = Math.max(bound1, bound2);
 				}
-				System.out.println(bound1+" "+bound2+" "+upper_bound[j][k]+" "+lower_bound[j][k]);
+				//System.out.println(bound1+" "+bound2+" "+upper_bound[j][k]+" "+lower_bound[j][k]);
 			}//end of this dim
 			
 		}//end of this line
@@ -359,9 +355,17 @@ public class DataProcessor {
 			}		
 		}
 		if(debug) {  
-			System.out.println("min: "+min_dim[7]+"\tmax: "+max_dim[7]+"\tmin interval: "+minimum_interval);
+			System.out.println("min: "+min_dim[1]+"\tmax: "+max_dim[1]+"\tmin interval: "+minimum_interval);
 		}
-
+		double[][] min_max_dim = new double[2][dim_range];
+		for(int i = 0; i < dim_range; i++) {
+			min_max_dim[0][i] = min_dim[i];
+		}
+		for(int i = 0; i < dim_range; i++) {
+			min_max_dim[1][i] = max_dim[i];
+		}
+		                               
+		return min_max_dim;
 
 	}
 	
@@ -369,6 +373,11 @@ public class DataProcessor {
 	private static double norm_square(double[] vector) {
 		double norm_square = 0;
 		for(int i = 0; i < vector.length; i++) {
+			
+			
+			
+			
+			
 			norm_square += vector[i] * vector[i];
 		}
 		return norm_square;
@@ -387,6 +396,6 @@ public class DataProcessor {
 //		test[3] = 100;
 //		combineSiftValues(test,4,4);
 //		createTestSift(100);
-		getMinMaxLSH(10, 128, 1, 1);
+		getMinMaxLSH(10, 10, 2);
 	}
 }

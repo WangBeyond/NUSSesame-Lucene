@@ -46,7 +46,7 @@ public class InitHandler implements ServerInvocationHandler{
 		}else {
 			System.out.println("Initialization error: invalid invocation type");
 		}
-		return null;
+		return 1;
 	}
 
 	@Override
