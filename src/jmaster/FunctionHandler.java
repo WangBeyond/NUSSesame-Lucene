@@ -241,16 +241,80 @@ public class FunctionHandler implements ServerInvocationHandler {
 	 * initialization for all Servers
 	 * */
 	public void initAllServers(int type, String indexfile) {
-
-		for(int i = 0; i < machines.size(); i++ ) {
-			initServer(i, type, indexfile);
+		
+		Vector<Future<Integer>> future_vec = new Vector<Future<Integer>>();
+		try {
+			for(int id = 0; id < machines.size(); id++ ) {
+				machines.elementAt(id).setSubsystem("Connect");
+				machines.elementAt(id).invoke(indexfile);
+				machines.elementAt(id).setSubsystem("Init");
+				InitTask initTask = new InitTask(machines.elementAt(id), type, machines.size());
+				Future<Integer> future = threadPool.submit(initTask);
+				future_vec.add(future);
+			}
+		} catch (Throwable e) {
+			// TODO Auto-generated catch block
+			System.out.println(Messager.INIT_FAIL);
+			if(debug)
+				e.printStackTrace();
+			System.exit(0);
+		}
+		//wait until all the tasks are done
+		int num_done = 0;
+		while (num_done < machines.size()) {
+			//sleep for some time
+			try {
+				Thread.sleep(SLEEP_TIME);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				System.out.println("System Errors.");
+				if(debug)
+					e.printStackTrace();
+			}
+			for(int i = 0;i < future_vec.size(); i++) {
+				if(future_vec.elementAt(i) != null && future_vec.elementAt(i).equals(-1)) {
+					System.out.println(Messager.INIT_FAIL);
+					System.exit(0);
+				} else if(future_vec.elementAt(i) != null && future_vec.elementAt(i).isDone()) {
+					num_done++;
+					future_vec.set(i, null);
+				}
+			}
 		}
 	}
 	
+	
 	public void initAllServers(int type) {
 
-		for(int i = 0; i < machines.size(); i++ ) {
-			initServer(i, type);
+		Vector<Future<Integer>> future_vec = new Vector<Future<Integer>>();
+		
+		for(int id = 0; id < machines.size(); id++ ) {
+			machines.elementAt(id).setSubsystem("Init");
+			InitTask initTask = new InitTask(machines.elementAt(id), type, machines.size());
+			Future<Integer> future = threadPool.submit(initTask);
+			future_vec.add(future);
+		}
+		//wait until all the tasks are done
+		int num_done = 0;
+		while (num_done < machines.size()) {
+			//sleep for some time
+			try {
+				Thread.sleep(SLEEP_TIME);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				System.out.println("System Errors.");
+				if(debug)
+					e.printStackTrace();
+			}
+			for(int i = 0;i < future_vec.size(); i++) {
+				if(future_vec.elementAt(i).equals(-1)) {
+					System.out.println(Messager.INIT_FAIL);
+					System.exit(0);
+				} else if(future_vec.elementAt(i) != null && future_vec.elementAt(i).isDone()) {
+					num_done++;
+					future_vec.set(i, null);
+				}
+			}
 		}
 	}
 	
@@ -819,6 +883,37 @@ class AddDocTask implements Callable<Integer>{
 		try {
 			System.out.println("Add Doc Task in id:\t"+id);
 			return (Integer) machines.elementAt(id).invoke(list);
+		} catch (Throwable e) {
+			// TODO Auto-generated catch block
+			if(JMaster.debug)
+				e.printStackTrace();
+			return -1;
+		}
+	}
+}
+	
+class InitTask implements Callable<Integer>{
+	
+	private Client machine;
+	int[] param;
+	
+	public InitTask(Client machine, int type, int nodeNum) {
+		this.machine = machine;
+		
+		//we have to send two parameters to the slave nodes
+		param = new int[2];
+		//one is the operation type, search or build
+		param[0] = type;
+		//the other is the number of the slave nodes which is used for mapping
+		param[1] = nodeNum;
+		
+	}
+	
+	@Override
+	public Integer call() throws Exception {
+		// TODO Auto-generated method stub
+		try {
+			return (Integer) machine.invoke(param);
 		} catch (Throwable e) {
 			// TODO Auto-generated catch block
 			if(JMaster.debug)
