@@ -13,6 +13,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -278,7 +279,8 @@ public class Index {
 	/**
 	 * write the value string to the binary output
 	 * 
-	 * @param v
+	 * @param values
+	 * 		The data values to write into binary file
 	 */
 	public void writeBin(int[] values) throws Throwable {
 		int id = values[values.length - 1];
@@ -298,8 +300,30 @@ public class Index {
 		vectorList = new ArrayList<int[]>();
 		long start = System.currentTimeMillis();
 		try {
+			int batch_size = 10000;
+			int totalInt = batch_size * (DIM_RANGE + 1);
+			byte[] buffer = new byte[totalInt*4];
 			while (true) {
-				// read int for sift feature
+				//load the vector data from binary data file to memory
+				
+				
+				int num = binIn.read(buffer);
+				ByteBuffer buf = ByteBuffer.wrap(buffer);
+				buf.asIntBuffer();
+				int count = num/(4*(DIM_RANGE + 1));
+				for(int i=0; i<count; i++){
+					int[] value_id = new int[DIM_RANGE + 1];
+					int vectorId = EndianUtils.swapInteger(buf.getInt());
+					value_id[DIM_RANGE] = vectorId;
+					for (int dim = 0; dim < DIM_RANGE; dim++) {
+						int value = EndianUtils.swapInteger(buf.getInt());
+						value_id[dim] = value;
+						//if(vectorId ==10000)
+							//System.out.print(value_id[dim]+" ");
+					}
+					vectorList.add(value_id);
+				}			
+				/*
 				int[] value_id = new int[DIM_RANGE + 1];
 				int vectorId = EndianUtils.swapInteger(binIn.readInt());
 				value_id[DIM_RANGE] = vectorId;
@@ -308,6 +332,13 @@ public class Index {
 					value_id[dim] = value;
 				}
 				vectorList.add(value_id);
+				
+				 */
+				if(num<batch_size){
+					long initTime = System.currentTimeMillis() - start;
+					System.out.println("Finish read binary data file\t"+initTime+" ms");
+					break;
+				}
 			}
 		} catch (EOFException e) {
 			long initTime = System.currentTimeMillis() - start;
@@ -991,11 +1022,13 @@ public class Index {
 			Index.num_query++;
 			start = System.currentTimeMillis();
 		}
-		// start scan search through all the values
+		
 		ReturnValue result = new ReturnValue();
 		K = qlist.get(0).getK();
 		PriorityQueue<Combo> pq = new PriorityQueue<Combo>(K,
 				new scanComparator());
+		
+		// start scan search through all the values
 		for (int i = 0; i < vectorList.size(); i++) {
 			int distance = 0;
 			boolean isCandidate = true;
@@ -1004,10 +1037,20 @@ public class Index {
 			for (int j = 0; j < DIM_RANGE; j++) {
 				distance += qlist.get(j).calcDistance(
 						qlist.get(j).getDimValue(), vector[j]);
-				if(pq.size() >= K && distance >= pq.peek().distance) {
+				//if the accumulated distance already exceeds the Kth candidate distance,
+				//then just break the loop and omit this vector
+				
+				if(pq.size() >= K && distance > 74239) {
 					isCandidate = false;
 					break;
 				}
+				
+				
+//				if(pq.size() >= K && distance >= pq.peek().distance) {
+//					isCandidate = false;
+//					break;
+//				}
+				
 			}
 			if (pq.size() < K)
 				pq.add(new Combo(distance, vectorId));
