@@ -1040,16 +1040,16 @@ public class Index {
 				//if the accumulated distance already exceeds the Kth candidate distance,
 				//then just break the loop and omit this vector
 				
-				if(pq.size() >= K && distance > 74239) {
-					isCandidate = false;
-					break;
-				}
-				
-				
-//				if(pq.size() >= K && distance >= pq.peek().distance) {
+//				if(pq.size() >= K && distance > 74239) {
 //					isCandidate = false;
 //					break;
 //				}
+				
+				
+				if(pq.size() >= K && distance >= pq.peek().distance) {
+					isCandidate = false;
+					break;
+				}
 				
 			}
 			if (pq.size() < K)
