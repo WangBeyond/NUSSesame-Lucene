@@ -300,22 +300,26 @@ public class Index {
 		vectorList = new ArrayList<int[]>();
 		long start = System.currentTimeMillis();
 		try {
-			int batch_size = 10000;
+			int batch_size = 1000;
 			int totalInt = batch_size * (DIM_RANGE + 1);
 			byte[] buffer = new byte[totalInt*4];
+		
 			while (true) {
 				//load the vector data from binary data file to memory
-				
 				
 				int num = binIn.read(buffer);
 				ByteBuffer buf = ByteBuffer.wrap(buffer);
 				buf.asIntBuffer();
+				
 				int count = num/(4*(DIM_RANGE + 1));
 				for(int i=0; i<count; i++){
 					int[] value_id = new int[DIM_RANGE + 1];
+					//int vectorId = buf.getInt();
 					int vectorId = EndianUtils.swapInteger(buf.getInt());
 					value_id[DIM_RANGE] = vectorId;
+					
 					for (int dim = 0; dim < DIM_RANGE; dim++) {
+						//int value = buf.getInt();
 						int value = EndianUtils.swapInteger(buf.getInt());
 						value_id[dim] = value;
 						//if(vectorId ==10000)

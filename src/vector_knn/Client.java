@@ -374,7 +374,7 @@ public class Client {
 		Client c = new Client("socket://127.0.0.1:8888");
 //		Client c = new Client("socket://137.132.145.132:8888");
 		vec_num = 250000;
-		nodes_num = 8;
+		nodes_num = 1;
 		vec_index = "Index_"+nodes_num+"_"+vec_num;
 		vec_scanfile = "Scanfile_"+nodes_num+"_"+vec_num+".bin";
 //		
