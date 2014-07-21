@@ -62,6 +62,9 @@ import org.apache.lucene.util.Version;
 
 import tool.DataProcessor;
 import vector_knn.SIFTConfig;
+import tool.ProtoAddVector;
+import tool.VectorListProto.Vector;
+import tool.VectorListProto.VectorList;
 
 /**
  * building the inverted with the interface of Lucene scanning the inverted list
@@ -146,9 +149,11 @@ public class Index {
 	// to create the data_field
 	private StringBuffer databuf;
 
-	private DataOutputStream binOut;
-	private DataInputStream binIn;
+	private FileOutputStream binOut;
+	private FileInputStream binIn;
 	private ArrayList<int[]> vectorList;
+	
+	VectorList.Builder vectorListProto;
 
 	public Index() {
 	}
@@ -263,12 +268,16 @@ public class Index {
 	}
 
 	/**
-	 * initialize the binary writer
+	 * initialize the binary writer for scanning use
 	 */
 	public void init_binwriter() {
+		
 		try {
-			this.binOut = new DataOutputStream(new BufferedOutputStream(
-					new FileOutputStream(indexFile)));
+//			this.binOut = new DataOutputStream(new BufferedOutputStream(
+//					new FileOutputStream(indexFile)));
+			DIM_RANGE = 128;
+			vectorListProto = VectorList.newBuilder();
+			this.binOut = new FileOutputStream(indexFile.toString());
 		} catch (IOException e) {
 			System.out.println("binary writer error");
 			if (debug)
@@ -284,10 +293,12 @@ public class Index {
 	 */
 	public void writeBin(int[] values) throws Throwable {
 		int id = values[values.length - 1];
-		binOut.writeInt(EndianUtils.swapInteger(id));
-		for (int i = 0; i < values.length - 1; i++) {
-			binOut.writeInt(EndianUtils.swapInteger(values[i]));
-		}
+//		binOut.writeInt(EndianUtils.swapInteger(id));
+//		for (int i = 0; i < values.length - 1; i++) {
+//			binOut.writeInt(EndianUtils.swapInteger(values[i]));
+//		}
+		Vector vector = ProtoAddVector.createVector(id, values, DIM_RANGE);
+		vectorListProto.addVector(vector);
 	}
 
 	/**
@@ -295,59 +306,32 @@ public class Index {
 	 */
 	public void init_scan() throws IOException {
 		DIM_RANGE = 128;
-		binIn = new DataInputStream(new BufferedInputStream(
-				new FileInputStream(indexFile)));
+		binIn = new FileInputStream(indexFile.toString());
 		vectorList = new ArrayList<int[]>();
 		long start = System.currentTimeMillis();
 		try {
-			int batch_size = 1000;
-			int totalInt = batch_size * (DIM_RANGE + 1);
-			byte[] buffer = new byte[totalInt*4];
-		
-			while (true) {
-				//load the vector data from binary data file to memory
-				
-				int num = binIn.read(buffer);
-				ByteBuffer buf = ByteBuffer.wrap(buffer);
-				buf.asIntBuffer();
-				
-				int count = num/(4*(DIM_RANGE + 1));
-				for(int i=0; i<count; i++){
-					int[] value_id = new int[DIM_RANGE + 1];
-					//int vectorId = buf.getInt();
-					int vectorId = EndianUtils.swapInteger(buf.getInt());
-					value_id[DIM_RANGE] = vectorId;
-					
-					for (int dim = 0; dim < DIM_RANGE; dim++) {
-						//int value = buf.getInt();
-						int value = EndianUtils.swapInteger(buf.getInt());
-						value_id[dim] = value;
-						//if(vectorId ==10000)
-							//System.out.print(value_id[dim]+" ");
-					}
-					vectorList.add(value_id);
-				}			
-				/*
+			VectorList vectorListBuf = VectorList.parseFrom(binIn);
+			
+			for(int i=0; i<vectorListBuf.getVectorCount(); i++){
+				Vector vector = vectorListBuf.getVector(i);
 				int[] value_id = new int[DIM_RANGE + 1];
-				int vectorId = EndianUtils.swapInteger(binIn.readInt());
+				int vectorId = (int)vector.getVectorId();
 				value_id[DIM_RANGE] = vectorId;
+				
 				for (int dim = 0; dim < DIM_RANGE; dim++) {
-					int value = EndianUtils.swapInteger(binIn.readInt());
-					value_id[dim] = value;
+					value_id[dim] = vector.getValue(dim);
 				}
 				vectorList.add(value_id);
-				
-				 */
-				if(num<batch_size){
-					long initTime = System.currentTimeMillis() - start;
-					System.out.println("Finish read binary data file\t"+initTime+" ms");
-					break;
-				}
 			}
+			
 		} catch (EOFException e) {
+			System.out.println(e.getMessage());
+		}
+		if (test) {
 			long initTime = System.currentTimeMillis() - start;
 			System.out.println("Finish read binary data file\t"+initTime+" ms");
 		}
+
 	}
 
 	/**
@@ -1112,6 +1096,7 @@ public class Index {
 	}
 
 	public void closeBinwriter() throws Throwable {
+		vectorListProto.build().writeTo(binOut);
 		binOut.close();
 	}
 
