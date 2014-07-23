@@ -154,6 +154,7 @@ public class Index {
 	private ArrayList<int[]> vectorList;
 	
 	VectorList.Builder vectorListProto;
+	VectorList vectorListBuf;
 
 	public Index() {
 	}
@@ -307,23 +308,9 @@ public class Index {
 	public void init_scan() throws IOException {
 		DIM_RANGE = 128;
 		binIn = new FileInputStream(indexFile.toString());
-		vectorList = new ArrayList<int[]>();
 		long start = System.currentTimeMillis();
 		try {
-			VectorList vectorListBuf = VectorList.parseFrom(binIn);
-			
-			for(int i=0; i<vectorListBuf.getVectorCount(); i++){
-				Vector vector = vectorListBuf.getVector(i);
-				int[] value_id = new int[DIM_RANGE + 1];
-				int vectorId = (int)vector.getVectorId();
-				value_id[DIM_RANGE] = vectorId;
-				
-				for (int dim = 0; dim < DIM_RANGE; dim++) {
-					value_id[dim] = vector.getValue(dim);
-				}
-				vectorList.add(value_id);
-			}
-			
+			vectorListBuf = VectorList.parseFrom(binIn);
 		} catch (EOFException e) {
 			System.out.println(e.getMessage());
 		}
@@ -1017,14 +1004,14 @@ public class Index {
 				new scanComparator());
 		
 		// start scan search through all the values
-		for (int i = 0; i < vectorList.size(); i++) {
+		for (int i = 0; i < vectorListBuf.getVectorCount(); i++) {
 			int distance = 0;
 			boolean isCandidate = true;
-			int[] vector = vectorList.get(i);
-			long vectorId = (long) vector[DIM_RANGE];
+			Vector vector = vectorListBuf.getVector(i);
+			long vectorId = vector.getVectorId();
 			for (int j = 0; j < DIM_RANGE; j++) {
 				distance += qlist.get(j).calcDistance(
-						qlist.get(j).getDimValue(), vector[j]);
+						qlist.get(j).getDimValue(), vector.getValue(j));
 				//if the accumulated distance already exceeds the Kth candidate distance,
 				//then just break the loop and omit this vector
 				

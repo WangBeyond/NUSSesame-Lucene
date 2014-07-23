@@ -114,7 +114,7 @@ public class DistributedManager {
 	}
 	
 	public static void main(String[] args){
-		String jarFileName = "Server4.70.jar";
+		String jarFileName = "Server4.72.jar";
 		if(args.length>0) {
 			jarFileName = args[0];
 		}

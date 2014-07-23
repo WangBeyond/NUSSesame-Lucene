@@ -374,7 +374,7 @@ public class Client {
 		Client c = new Client("socket://127.0.0.1:8888");
 //		Client c = new Client("socket://137.132.145.132:8888");
 		vec_num = 250000;
-		nodes_num = 1;
+		nodes_num = 8;
 		vec_index = "Index_"+nodes_num+"_"+vec_num;
 		vec_scanfile = "Scanfile_"+nodes_num+"_"+vec_num+".bin";
 //		
@@ -382,7 +382,7 @@ public class Client {
 //			vec_num = Integer.valueOf(args[0]);
 		debug = false;
 //		long start = System.currentTimeMillis();
-//		c.buildIndex(datafile, vec_num, vec_index);
+// 		c.buildIndex(datafile, vec_num, vec_index);
 //		c.distributeDatafile(datafile, vec_num, vec_scanfile);
 //		System.out.println("Building Done! Time: "+(System.currentTimeMillis() - start)+"ms");
 //		System.out.println();
