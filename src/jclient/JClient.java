@@ -1,6 +1,7 @@
 package jclient;
 
 import java.net.MalformedURLException;
+import java.util.List;
 
 import lucene.Index;
 import lucene.QueryConfig;
@@ -73,7 +74,10 @@ public class JClient {
 			}
 			else if(parameters.function_type == Param.FUNCTION_TYPE.answerQuery
 					|| parameters.function_type == Param.FUNCTION_TYPE.answerStringQuery
-					|| parameters.function_type == Param.FUNCTION_TYPE.getData) {
+					|| parameters.function_type == Param.FUNCTION_TYPE.getData
+					|| parameters.function_type == Param.FUNCTION_TYPE.scanQuery
+					|| parameters.function_type == Param.FUNCTION_TYPE.rangeQuery
+					|| parameters.function_type == Param.FUNCTION_TYPE.lshQuery) {
 				System.out.println(Messager.SEARCH_FAIL);
 			}
 			else if(parameters.function_type == Param.FUNCTION_TYPE.closeAllIndexwriters) {
@@ -189,6 +193,24 @@ public class JClient {
 		if(this.curVecNum > this.maxVecNum) 
 			flush();
 	}	
+	
+	public void addPairs(long vector_key, int ndim, List<Long> combinedHash, int value_bilength, int type) {
+		
+		parameters.function_type = Param.FUNCTION_TYPE.addPairs_lshhash;
+		parameters.param_long_elementIDs.add(vector_key);
+		parameters.param_int_ndims.add(ndim);
+		parameters.param_int_type = type;
+		parameters.param_int_value_bi_length = value_bilength;
+		for(int i = 0; i < ndim; i++) //iterates through dim of values and an id
+			parameters.param_long_combinedhashes.add(combinedHash.get(i));
+		
+		//if there are enough data, then flush
+		this.curVecNum++;
+		if(this.curVecNum > this.maxVecNum) 
+			flush();
+	}	
+	
+	
 	public void flush() {
 		
 		//call the remote function on master node
@@ -234,6 +256,12 @@ public class JClient {
 		parameters.qconfig = config;
 		return (long[]) callMasterFunction(parameters);
 		
+	}
+	
+	public ReturnValue lshQuery(QueryConfig config[]) {
+		parameters.function_type = Param.FUNCTION_TYPE.lshQuery;
+		parameters.qconfig = config;
+		return (ReturnValue) callMasterFunction(parameters);
 	}
 	
 	public String getData(long index) {

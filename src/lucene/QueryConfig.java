@@ -114,6 +114,7 @@ public abstract class QueryConfig implements Serializable{
 				values.length * this.binary_value_range_length);
 	}
 	
+
 	public long getQuerylong() {
 		return this.querylong;
 	}

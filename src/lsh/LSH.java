@@ -37,6 +37,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import lucene.QueryConfig;
+
 
 /**
  * Implements a Locality Sensitive Hash scheme.
@@ -46,10 +48,13 @@ public class LSH {
 	List<Vector> dataset;
 	private Index index;
 	private final HashFamily hashFamily;
+	private boolean isProjectionGenerated;
+
 	
-	public LSH(List<Vector> dataset,HashFamily hashFamily) {
+	public LSH(List<Vector> dataset,HashFamily hashFamily, boolean isProjectionGenerated) {
 		this.dataset = dataset;
 		this.hashFamily = hashFamily;
+		this.isProjectionGenerated = isProjectionGenerated;
 	}
 	
 	/**
@@ -60,14 +65,55 @@ public class LSH {
 	 * @param numberOfHashTables
 	 *            The number of hash tables to use.
 	 */
-	public void buildIndex(int numberOfHashes, int numberOfHashTables){
+	public List<List<Long>> buildIndex(int numberOfHashes, int numberOfHashTables){
 		index = Index.deserialize(hashFamily, numberOfHashes, numberOfHashTables);
+		
+		List<List<Long>> combineValueCollection = new ArrayList<List<Long>>();
+		
 		if(dataset != null){
-			for(Vector vector : dataset){
-				index.index(vector);
+			
+			int count = 0;
+			List<Long>minList = new ArrayList<Long>();
+			List<Long>maxList = new ArrayList<Long>();
+
+			for(int i = 0; i < numberOfHashTables; i ++){
+				minList.add(Long.MAX_VALUE);
+				maxList.add(new Long(0));
 			}
+			for(Vector vector : dataset){
+				boolean isPrint = false;
+				if(count%10000==0){
+					isPrint = false;
+					System.out.println(count);
+				}
+				List<Long> combineValues = index.index(vector, isPrint);
+				
+				combineValueCollection.add(combineValues);
+				
+				for(int i = 0; i < numberOfHashTables; i ++){
+					if(minList.get(i) > combineValues.get(i))
+						minList.set(i, combineValues.get(i));
+					if(maxList.get(i) < combineValues.get(i))
+						maxList.set(i, combineValues.get(i));
+				}
+				
+				count++;
+			} 
+			for(int i = 0; i < numberOfHashTables; i ++){
+				System.out.print(minList.get(i)+" ");
+			}
+			System.out.println();
+			for(int i = 0; i < numberOfHashTables; i ++){
+				System.out.print(maxList.get(i)+" ");
+			}
+			System.out.println();
 			Index.serialize(index);
 		}
+		return combineValueCollection;
+	}
+	
+	public List<Long> index(Vector vector){
+		return index.index(vector, false);
 	}
 	
 	/**
@@ -211,17 +257,12 @@ public class LSH {
 			data = data.subList(0, maxSize);
 		}
 		boolean firstColumnIsKey = true;
-		try{
-			Double.parseDouble(data.get(0)[0]);
-		}catch(Exception e){
-			firstColumnIsKey = true;
-		}
 		int dimensions = firstColumnIsKey ? data.get(0).length - 1 : data.get(0).length;
 		int startIndex = firstColumnIsKey ? 1 : 0;
 		for(String[] row : data){
 			Vector item = new Vector(dimensions);
 			if(firstColumnIsKey){
-				item.setKey(row[0]);
+				item.setKey(Long.parseLong(row[0]));
 			}
 			for (int d = startIndex; d < row.length; d++) {
 				double value = Double.parseDouble(row[d]);
@@ -230,6 +271,14 @@ public class LSH {
 			ret.add(item);
 		}			
 		return ret;
+	}
+	
+	public static Vector readQueryConfig(List<QueryConfig> qlist) {
+		Vector vector = new Vector(qlist.size());
+		for (int dim = 0; dim < qlist.size(); dim++) {
+			vector.set(dim, qlist.get(dim).getDimValue());
+		}
+		return vector;
 	}
 	
 	static double determineRadius(List<Vector> dataset,DistanceMeasure measure,int timeout){

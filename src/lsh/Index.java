@@ -27,6 +27,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInput;
@@ -85,17 +86,43 @@ public class Index implements Serializable{
 		evaluated = 0;
 	}
 	
+	
 	/**
 	 * Add a vector to the current index. The hashes are calculated with the
 	 * current hash family and added in the right place.
 	 * 
 	 * @param vector
 	 *            The vector to add.
-	 */
-	public void index(Vector vector) {
-		for (HashTable table : hashTable) {
-			table.add(vector);
+	 */ 
+	public List<Long> index(Vector vector,boolean record) {
+    	List<Long> combineValues = new ArrayList<Long>();
+		try{
+			if(record) {
+		    	FileWriter fileWriter = new FileWriter("hashvalues_4_3.txt",true);
+
+				for (HashTable table : hashTable) {
+					
+					Long combineValue = table.add(vector);
+					combineValues.add(combineValue);
+					fileWriter.write(combineValue+" ");
+				}
+				fileWriter.write("\n");
+		    	fileWriter.close();
+			} else {
+				for (HashTable table : hashTable) {
+					Long combineValue = table.add(vector);
+					combineValues.add(combineValue);
+				}
+				
+			}
+
+
+		} catch(Exception e){
+			System.out.println(e);
+			e.printStackTrace();
 		}
+    	return combineValues;
+
 	}
 	
 	/**

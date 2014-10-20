@@ -4,7 +4,6 @@ import java.util.List;
 
 import javax.management.MBeanServer;
 
-import kv.*;
 
 import lucene.Index;
 import lucene.QueryConfig;
@@ -14,11 +13,11 @@ import org.jboss.remoting.ServerInvocationHandler;
 import org.jboss.remoting.ServerInvoker;
 import org.jboss.remoting.callback.InvokerCallbackHandler;
 
-public class QueryHandler implements ServerInvocationHandler {
+public class LshHandler implements ServerInvocationHandler {
 
 	private Index index;	
 	
-	QueryHandler (Index index) throws Throwable {
+	LshHandler (Index index) throws Throwable {
 		
 		this.index = index;
 	}
@@ -36,12 +35,7 @@ public class QueryHandler implements ServerInvocationHandler {
 		// TODO Auto-generated method stub	
 		@SuppressWarnings("unchecked")
 		List<QueryConfig> qlist = (List<QueryConfig>) arg.getParameter();
-		if(qlist.get(0).theta == -1) {
-			return index.generalSearch(qlist);
-		} else {
-			return index.rangeSearch(qlist);
-		}
-
+		return this.index.lshSearch(qlist);
 	}
 
 	@Override

@@ -45,7 +45,7 @@ public class Vector implements Serializable {
 	
 	
 	/**
-	 * An optional key, identifier for the vector.
+	 * key, identifier for the vector.
 	 */
 	private long key;
 

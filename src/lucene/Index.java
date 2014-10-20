@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Map.Entry;
 import java.util.Set;
-
 import org.apache.commons.io.EndianUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenFilter;
@@ -59,7 +58,6 @@ import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.NumericUtils;
 import org.apache.lucene.util.Version;
-
 import tool.DataProcessor;
 import vector_knn.SIFTConfig;
 import tool.ProtoAddVector;
@@ -71,12 +69,9 @@ import tool.VectorListProto.VectorList;
  * 
  * @author huangzhi
  * */
-
 public class Index {
-
 	// for debug
 	static boolean debug = false;
-
 	// for testing
 	static boolean test = true;
 	static long init_time = 0;
@@ -92,7 +87,6 @@ public class Index {
 	static long initbuilding_time = 0;
 	static int num_build = 0;
 	static int num_query = 0;
-
 	// for general use
 	public static int VECTOR_BUILD = 1;
 	public static int STRING_BUILD = 2;
@@ -101,10 +95,8 @@ public class Index {
 	public static int VECTOR_SCAN = 5;
 	public static int SCAN_BUILD = 6;
 	public static int RANGE_QUERY = 7;
-
 	// used in previous version, @deprecated now
 	public static int BUILD = STRING_BUILD;
-
 	private File indexFile;
 	private String mapfilename = "key_enum.map";
 	private PayloadAnalyzer payload_analyzer;
@@ -130,7 +122,6 @@ public class Index {
 	private long[] idmap;
 	// map the key and posting list entrance
 	private HashMap<String, DocsAndPositionsEnum> enum_map;
-
 	// Maximum Buffer Size
 	private int MAX_BUFF = 48;
 	// number of dimensions to be combined
@@ -139,20 +130,16 @@ public class Index {
 	private static int DIM_RANGE = 0;
 	// Top K
 	private static int K = 0;
-
 	// expand direction
 	private static int UPWARDS = -1;
 	private static int DOWNWARDS = 1;
-
 	// to create the TextField for vector insertion
 	private StringBuffer strbuf;
 	// to create the data_field
 	private StringBuffer databuf;
-
 	private FileOutputStream binOut;
 	private FileInputStream binIn;
 	private ArrayList<int[]> vectorList;
-	
 	VectorList.Builder vectorListProto;
 	VectorList vectorListBuf;
 
@@ -160,7 +147,6 @@ public class Index {
 	}
 
 	public void setIndexfile(String indexfilename) {
-
 		this.indexFile = new File(indexfilename);
 		System.out.println("The Index File is set: " + indexfilename);
 	}
@@ -172,7 +158,6 @@ public class Index {
 	 * */
 	public void init_building() throws Throwable {
 		startbuilding_time = System.currentTimeMillis();
-
 		// PayloadAnalyzer to map the Lucene id and Doc id
 		payload_analyzer = new PayloadAnalyzer(new IntegerEncoder());
 		// MMap
@@ -189,11 +174,9 @@ public class Index {
 		}
 		// use Memory Map to store the index
 		MMwriter = new IndexWriter(MMapDir, config);
-
 		id_field = new LongField(this.fieldname1, -1, Field.Store.NO);
 		value_field = new TextField(this.fieldname2, "-1", Field.Store.YES);
 		data_field = new TextField(this.fieldname3, "", Field.Store.NO);
-
 		strbuf = new StringBuffer();
 		databuf = new StringBuffer();
 		initbuilding_time = System.currentTimeMillis() - startbuilding_time;
@@ -203,11 +186,12 @@ public class Index {
 	 * Add a document. The document contains two fields: one is the element id,
 	 * the other is the values on each dimension
 	 * 
-	 * @param id: vector id
-	 * @param values[]: the values of each dimension
+	 * @param id
+	 *            : vector id
+	 * @param values
+	 *            []: the values of each dimension
 	 * */
 	public void addDoc(long id, long[] values) {
-
 		Document doc = new Document();
 		// clear the StringBuffer
 		strbuf.setLength(0);
@@ -221,7 +205,6 @@ public class Index {
 		id_field.setLongValue(id);
 		value_field.setStringValue(strbuf.toString());
 		data_field.setStringValue("ID|" + id);
-
 		long start2 = System.currentTimeMillis();
 		doc.add(id_field);
 		doc.add(value_field);
@@ -248,13 +231,10 @@ public class Index {
 	 * 
 	 * */
 	public void addDoc(long id, String v) {
-
 		Document doc = new Document();
-
 		id_field.setLongValue(id);
 		value_field.setStringValue(v);
 		data_field.setStringValue("ID|" + id);
-
 		doc.add(id_field);
 		doc.add(value_field);
 		doc.add(data_field);
@@ -272,10 +252,9 @@ public class Index {
 	 * initialize the binary writer for scanning use
 	 */
 	public void init_binwriter() {
-		
 		try {
-//			this.binOut = new DataOutputStream(new BufferedOutputStream(
-//					new FileOutputStream(indexFile)));
+			// this.binOut = new DataOutputStream(new BufferedOutputStream(
+			// new FileOutputStream(indexFile)));
 			DIM_RANGE = 128;
 			vectorListProto = VectorList.newBuilder();
 			this.binOut = new FileOutputStream(indexFile.toString());
@@ -290,14 +269,14 @@ public class Index {
 	 * write the value string to the binary output
 	 * 
 	 * @param values
-	 * 		The data values to write into binary file
+	 *            The data values to write into binary file
 	 */
 	public void writeBin(int[] values) throws Throwable {
 		int id = values[values.length - 1];
-//		binOut.writeInt(EndianUtils.swapInteger(id));
-//		for (int i = 0; i < values.length - 1; i++) {
-//			binOut.writeInt(EndianUtils.swapInteger(values[i]));
-//		}
+		// binOut.writeInt(EndianUtils.swapInteger(id));
+		// for (int i = 0; i < values.length - 1; i++) {
+		// binOut.writeInt(EndianUtils.swapInteger(values[i]));
+		// }
 		Vector vector = ProtoAddVector.createVector(id, values, DIM_RANGE);
 		vectorListProto.addVector(vector);
 	}
@@ -316,9 +295,9 @@ public class Index {
 		}
 		if (test) {
 			long initTime = System.currentTimeMillis() - start;
-			System.out.println("Finish read binary data file\t"+initTime+" ms");
+			System.out.println("Finish read binary data file\t" + initTime
+					+ " ms");
 		}
-
 	}
 
 	/**
@@ -329,13 +308,11 @@ public class Index {
 			indexReader.close();
 		if (areader != null)
 			areader.close();
-
 		indexReader = DirectoryReader.open(MMapDirectory.open(indexFile));
 		// change the reader
 		areader = SlowCompositeReaderWrapper.wrap(indexReader);
 		position_map = new HashMap<String, DocsEnum>();
 		bi_position_map = new HashMap<String, long[]>();
-
 		// The index for datafield (markfield)
 		// map the lucene id and doc id
 		idmap = new long[indexReader.maxDoc()];
@@ -360,7 +337,6 @@ public class Index {
 	 * disk.
 	 * */
 	private void mapKeyEnum() {
-
 		long start = System.currentTimeMillis();
 		System.out.println("Starting mapping the keys...");
 		enum_map = new HashMap<String, DocsAndPositionsEnum>();
@@ -387,9 +363,7 @@ public class Index {
 		}
 		init_time = (System.currentTimeMillis() - start);
 		System.out.println("Mapping Done! Time:\t" + init_time + " ms");
-
 	}
-
 
 	/**
 	 * search for different kinds of data
@@ -398,13 +372,11 @@ public class Index {
 	 * @throws Throwable
 	 * */
 	public ReturnValue generalSearch(QueryConfig config) throws Throwable {
-
 		long start = 0;
 		if (test) {
 			Index.num_query++;
 			start = System.currentTimeMillis();
 		}
-
 		// start search
 		ReturnValue revalue;
 		if (config.getType() == QueryConfig.STRING)
@@ -434,15 +406,11 @@ public class Index {
 		return revalue;
 	}
 
-	
-	
-	
 	/**
 	 * To lower the remote function calling cost, the salve node handle a batch
 	 * of every time
 	 * */
 	public ReturnValue generalSearch(List<QueryConfig> qlist) throws Throwable {
-
 		ReturnValue result = new ReturnValue();
 		ReturnValue revalue = new ReturnValue();
 		K = qlist.get(0).getK();
@@ -451,12 +419,10 @@ public class Index {
 			// set searching configuration
 			NUM_COMBINATION = qlist.get(0).num_combination;
 			DIM_RANGE = qlist.get(0).getDimRange();
-
 			Candidates candidates = null;
 			int num_round = 0;
 			while (true) {
 				System.out.println("Round:\t" + num_round++);
-
 				for (int i = 0; i < qlist.size(); i++) {
 					revalue.merge((generalSearch(qlist.get(i))));
 				}
@@ -467,7 +433,6 @@ public class Index {
 				if (candidates.elements_min_upperbound[0].upper_bound <= candidates.elements_min_lowerbound[0].lower_bound)
 					break;
 			}
-
 			long index[] = new long[K];
 			// record the K nearest neighbors
 			if (candidates != null) {
@@ -486,7 +451,6 @@ public class Index {
 		}
 		// if we search for string, it is simpler. we do not have to iterate
 		else if (qlist.get(0).getType() == QueryConfig.STRING) {
-
 			// just combine the result of each
 			for (int i = 0; i < qlist.size(); i++)
 				revalue.merge(stringSearch(qlist.get(i)));
@@ -500,81 +464,68 @@ public class Index {
 						.get(i).getKey())));
 			}
 		}
-		
 		return result;
 	}
 
-	
 	/**
 	 * rangeSearch is similar to vector search in generalSearch but it only
 	 * conducts the first iteration
 	 * */
 	public ReturnValue rangeSearch(List<QueryConfig> qlist) throws Throwable {
-		
 		ReturnValue result = new ReturnValue();
 		double theta = qlist.get(0).theta;
-		double pValue = ((SIFTConfig)qlist.get(0)).pValue;
-		
-		// if we search the vector 
+		double pValue = ((SIFTConfig) qlist.get(0)).pValue;
+		// if we search the vector
 		if (qlist.get(0).getType() == QueryConfig.VECTOR) {
-			
-			//range query to get candidates and do intersection
+			// range query to get candidates and do intersection
 			NUM_COMBINATION = qlist.get(0).num_combination;
 			DIM_RANGE = qlist.get(0).getDimRange();
 			System.out.println(result.table.keySet().size());
 			result.merge(generalSearch(qlist.get(0)), qlist.get(0).weight);
 			System.out.println(result.table.keySet().size());
-
 			for (int i = 1; i < qlist.size(); i++) {
-				result.intersect(generalSearch(qlist.get(i)),qlist.get(i).weight);
-				//System.out.println(result.table.keySet().size()+" "+248000+" "+result.table.get((long)248000)[1]);
+				result.intersect(generalSearch(qlist.get(i)),
+						qlist.get(i).weight);
+				// System.out.println(result.table.keySet().size()+" "+248000+" "+result.table.get((long)248000)[1]);
 			}
-
 			result.normalizeDist(pValue);
-
-			//Verify the candidates with theta value
+			// Verify the candidates with theta value
 			Set<Long> indexSet = result.table.keySet();
 			List<Long> delList = new ArrayList<Long>();
-
 			for (Long index : indexSet) {
-				if(index==248000)
-					System.out.println(index+" "+result.table.get(index)[1] +" "+getData(index));
+				if (index == 248000)
+					System.out.println(index + " " + result.table.get(index)[1]
+							+ " " + getData(index));
 				float distance = result.table.get(index)[1];
-				//System.out.println(distance);
+				// System.out.println(distance);
 				if (distance > theta) {
 					delList.add(index);
 				}
-			
 			}
-			if(test){
-				System.out.println("Found "+indexSet.size()+" candidates");
+			if (test) {
+				System.out.println("Found " + indexSet.size() + " candidates");
 			}
-
-			//Use delList to store the indices to delete first, avoiding the java.util.ConcurrentModificationException 
+			// Use delList to store the indices to delete first, avoiding the
+			// java.util.ConcurrentModificationException
 			for (Long index : delList) {
 				result.table.remove(index);
 			}
-			
-
-			if(test) {
+			if (test) {
 				indexSet = result.table.keySet();
-				System.out.println("Found "+indexSet.size()+" features");
+				System.out.println("Found " + indexSet.size() + " features");
 				for (Long index : indexSet) {
 					float distance = result.table.get(index)[1];
-					System.out.println(index+"\t"+distance);
+					System.out.println(index + "\t" + distance);
 				}
 			}
 		}
-		
 		return result;
 	}
-	
-	
+
 	/**
 	 * calculate the bounds and get candidates
 	 * */
 	private Candidates getCandidates(ReturnValue revalue, int dim_range, int k) {
-
 		List<Map.Entry<Long, float[]>> list = new ArrayList<Map.Entry<Long, float[]>>(
 				revalue.table.entrySet());
 		Candidates candidate = new Candidates();
@@ -612,7 +563,6 @@ public class Index {
 		}
 		candidate.elements_min_lowerbound = new QueueElement[1];
 		candidate.elements_min_upperbound = new QueueElement[queue.size()];
-
 		// hash map is used to find the element with the minimum lower bound
 		HashMap<Long, Long> id_map = new HashMap<Long, Long>();
 		for (int i = 0; i < k; i++) {
@@ -620,7 +570,6 @@ public class Index {
 			candidate.elements_min_upperbound[i] = queue.poll();
 			id_map.put(candidate.elements_min_upperbound[i].element_id, null);
 		}
-
 		// find the one with minimum lower bound
 		float min_bound = Float.MAX_VALUE;
 		candidate.elements_min_lowerbound[0] = new QueueElement();
@@ -638,7 +587,6 @@ public class Index {
 	 * random access we can get data by providing the id
 	 * */
 	public String getData(long id) {
-
 		// the enumerator of value list
 		DocsEnum value_enum;
 		// create a term for query
@@ -665,7 +613,6 @@ public class Index {
 	 * calculate the actual distance for local TopK
 	 * */
 	private float[] getDistances(long ids[], List<QueryConfig> qlist) {
-
 		float distances[] = new float[ids.length];
 		String values[];
 		int actual_value;
@@ -681,7 +628,6 @@ public class Index {
 						qlist.get(j).getDimValue(), actual_value);
 			}
 		}
-
 		return distances;
 	}
 
@@ -689,7 +635,6 @@ public class Index {
 	 * search the sub-sequence
 	 * */
 	public ReturnValue stringSearch(QueryConfig config) throws Throwable {
-
 		ReturnValue revalue = new ReturnValue();
 		// store some information for return value
 		revalue.querystring = config.getQuerystring();
@@ -723,7 +668,6 @@ public class Index {
 		else {
 			value_enum = enum_map.get(config.getQuerystring());
 		}
-
 		// scan the list for a certain length
 		int count = 0, lucene_doc_id = -1;
 		long element_id;
@@ -741,7 +685,6 @@ public class Index {
 				return revalue;
 			}
 			count++;
-
 			// update the table
 			// get the element id
 			element_id = idmap[lucene_doc_id];
@@ -773,17 +716,13 @@ public class Index {
 	 **/
 	public void scanList(Long querylong, QueryConfig config, ReturnValue revalue)
 			throws Throwable {
-
 		if (debug)
 			System.out.println("Scanning List: " + querylong);
-
 		long start_time = 0;
 		if (test)
 			start_time = System.currentTimeMillis();
-
 		DocsAndPositionsEnum enumer = null;
 		String keystring = String.valueOf(querylong);
-
 		if (enum_map.containsKey(keystring)) {
 			enumer = enum_map.get(keystring);
 		}
@@ -796,21 +735,17 @@ public class Index {
 		// the time to scan the key list, should be O(log(n))
 		if (test)
 			Index.scanning_key_list_time += (System.currentTimeMillis() - start_time);
-
 		if (test)
 			start_time = System.currentTimeMillis();
-
 		// all the elements has the same distance, so we have to calculate only
 		// once
 		float distance = config.calcDistance(config.getDimValue(),
 				DataProcessor.getValue(querylong,
 						config.binary_value_range_length
 								* config.num_combination));
-
 		// the time to calculate the distance
 		if (test)
 			Index.calc_time += (System.currentTimeMillis() - start_time);
-
 		if (enumer == null) {
 			if (debug) {
 				System.out.println("Not Found: " + querylong);
@@ -821,10 +756,8 @@ public class Index {
 		// scanning
 		if (test)
 			start_time = System.currentTimeMillis();
-
 		BytesRef buf = new BytesRef();
 		long doc_id;
-
 		while ((lucene_doc_id = enumer.nextDoc()) != DocsAndPositionsEnum.NO_MORE_DOCS) {
 			doc_id = idmap[lucene_doc_id];
 			float count_dis[] = new float[2];
@@ -833,7 +766,6 @@ public class Index {
 			count_dis[1] = distance;
 			revalue.table.put(doc_id, count_dis);
 		}
-
 		if (test)
 			Index.scanning_value_list_time += (System.currentTimeMillis() - start_time);
 	}
@@ -845,14 +777,12 @@ public class Index {
 	 * @throws thowable
 	 * */
 	public ReturnValue vectorSearch(QueryConfig config) throws Throwable {
-
 		ReturnValue revalue = new ReturnValue();
 		revalue.querylong = config.getQuerylong();
 		String id_query = String.valueOf(config.queryId) + "+"
 				+ config.getQuerylong();
 		// to store the keys of last scan
 		long[] keys = new long[2];
-
 		// continue scanning from last position
 		// find the start position
 		if (bi_position_map.containsKey(id_query)) {
@@ -871,7 +801,6 @@ public class Index {
 						break;
 				}
 			}
-
 			// expand downwards
 			key = keys[1];
 			if (key != -1) {
@@ -886,10 +815,8 @@ public class Index {
 						break;
 				}
 			}
-
 			// store the current position
 			bi_position_map.put(id_query, keys);
-
 			// calculate the maximum distance and minimum distance on this
 			// dimension
 			// minimum distance
@@ -902,13 +829,11 @@ public class Index {
 					config.binary_value_range_length * config.num_combination);
 			dis2 = config.calcDistance(config.getDimValue(), current_value);
 			revalue.min_dis = Math.max(dis1, dis2);
-
 			// maximum distance
 			dis1 = config.calcDistance(0, config.getDimValue());
 			dis2 = config.calcDistance(config.getValueRange(),
 					config.getDimValue());
 			revalue.max_dis = Math.max(dis1, dis2);
-
 			if (debug) {
 				System.out.println("return value distance:" + revalue.max_dis
 						+ "\t" + revalue.min_dis);
@@ -918,7 +843,6 @@ public class Index {
 					System.exit(-1);
 				}
 			}
-
 		}
 		// for the first time
 		else {
@@ -937,7 +861,6 @@ public class Index {
 				} else
 					break;
 			}
-
 			key = config.getQuerylong();
 			// expand to downwards
 			for (int i = 1; i <= config.getDownRange(); i++) {
@@ -950,10 +873,8 @@ public class Index {
 				} else
 					break;
 			}
-
 			// store for next iteration
 			bi_position_map.put(id_query, keys);
-
 			// calculate the possible distance
 			long current_value;
 			float dis1, dis2;
@@ -964,12 +885,10 @@ public class Index {
 					config.binary_value_range_length * config.num_combination);
 			dis2 = config.calcDistance(config.getDimValue(), current_value);
 			revalue.min_dis = Math.max(dis1, dis2);
-
 			dis1 = config.calcDistance(0, config.getDimValue());
 			dis2 = config.calcDistance(config.getValueRange(),
 					config.getDimValue());
 			revalue.max_dis = Math.max(dis1, dis2);
-
 			if (debug) {
 				System.out.println("return value distance:" + revalue.max_dis
 						+ "\t" + revalue.min_dis);
@@ -980,10 +899,8 @@ public class Index {
 				}
 			}
 		}
-
 		return revalue;
 	}
-
 
 	/**
 	 * search for different kinds of data
@@ -997,12 +914,10 @@ public class Index {
 			Index.num_query++;
 			start = System.currentTimeMillis();
 		}
-		
 		ReturnValue result = new ReturnValue();
 		K = qlist.get(0).getK();
 		PriorityQueue<Combo> pq = new PriorityQueue<Combo>(K,
 				new scanComparator());
-		
 		// start scan search through all the values
 		for (int i = 0; i < vectorListBuf.getVectorCount(); i++) {
 			int distance = 0;
@@ -1012,20 +927,17 @@ public class Index {
 			for (int j = 0; j < DIM_RANGE; j++) {
 				distance += qlist.get(j).calcDistance(
 						qlist.get(j).getDimValue(), vector.getValue(j));
-				//if the accumulated distance already exceeds the Kth candidate distance,
-				//then just break the loop and omit this vector
-				
-//				if(pq.size() >= K && distance > 74239) {
-//					isCandidate = false;
-//					break;
-//				}
-				
-				
-				if(pq.size() >= K && distance >= pq.peek().distance) {
+				// if the accumulated distance already exceeds the Kth candidate
+				// distance,
+				// then just break the loop and omit this vector
+				// if(pq.size() >= K && distance > 74239) {
+				// isCandidate = false;
+				// break;
+				// }
+				if (pq.size() >= K && distance >= pq.peek().distance) {
 					isCandidate = false;
 					break;
 				}
-				
 			}
 			if (pq.size() < K)
 				pq.add(new Combo(distance, vectorId));
@@ -1034,11 +946,9 @@ public class Index {
 				pq.add(new Combo(distance, vectorId));
 			}
 		}
-
 		if (test) {
 			System.out.println("Scan searching time:\t"
 					+ (System.currentTimeMillis() - start));
-
 		}
 		System.out.println("Nearest vecotrIDs");
 		for (Combo combo : pq) {
@@ -1048,7 +958,6 @@ public class Index {
 			count_dis[1] = combo.distance;
 			result.table.put(combo.docID, count_dis);
 		}
-
 		return result;
 	}
 
@@ -1057,7 +966,6 @@ public class Index {
 	 * */
 	private long createKey(long ori, int length, int direction,
 			QueryConfig config) {
-
 		long key = -1;
 		if (direction == UPWARDS)
 			key = ori - length;
@@ -1091,7 +999,6 @@ public class Index {
 	 * the following functions serve for the purpose of testing
 	 * */
 	public static void main(String[] args) throws Throwable {
-
 		Index index = new Index();
 		int num = 100;
 		String indexname = "Index_1_" + num;
@@ -1101,37 +1008,31 @@ public class Index {
 	}
 
 	private void testPayload() throws Throwable {
-
 		int total = 0;
-
 		for (int i = 0; i < 128; i++) {
 			Term term = new Term(fieldname2, String.valueOf(i));
 			BytesRef buf = new BytesRef();
 			int doc_id = -1, lucene_doc_id;
 			DocsAndPositionsEnum dp = areader.termPositionsEnum(term);
-
 			if (dp != null) {
 				System.out.print(i + ":\t");
 				// mapping the doc id and lucene id
 				while ((lucene_doc_id = dp.nextDoc()) != DocsAndPositionsEnum.NO_MORE_DOCS) {
-
 					dp.nextPosition();
 					buf = dp.getPayload();
 					doc_id = PayloadHelper.decodeInt(buf.bytes, buf.offset);
 					total++;
 					System.out.print("<" + lucene_doc_id + ", ");
-					System.out.print(doc_id + ">  ");
+					System.out.print(doc_id + "> ");
 				}
 				System.out.println();
 			}
 		}
 		System.out.println(total);
-
 	}
 }
 
 class PayloadAnalyzer extends Analyzer {
-
 	private PayloadEncoder encoder;
 
 	PayloadAnalyzer(PayloadEncoder encoder) {
@@ -1173,14 +1074,12 @@ class PayloadAnalyzer extends Analyzer {
  * The following classes are used to build the priority queue
  * */
 class QueueElement {
-
 	public long element_id = -1;
 	public float upper_bound = Float.MAX_VALUE;
 	public float lower_bound = Float.MIN_VALUE;
 }
 
 class UpperboundComparator implements Comparator<QueueElement> {
-
 	// build a maximum queue for upper bound
 	@Override
 	public int compare(QueueElement o1, QueueElement o2) {
@@ -1190,24 +1089,20 @@ class UpperboundComparator implements Comparator<QueueElement> {
 }
 
 class Candidates {
-
 	boolean isRealTopK = false;
 	QueueElement elements_min_upperbound[];
 	QueueElement elements_min_lowerbound[];
 }
 
 class scanComparator implements Comparator<Combo> {
-
 	@Override
 	public int compare(Combo arg0, Combo arg1) {
 		// TODO Auto-generated method stub
 		return arg1.distance - arg0.distance;
 	}
-
 }
 
 class Combo {
-
 	int distance;
 	long docID;
 

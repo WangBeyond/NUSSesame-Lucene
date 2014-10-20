@@ -32,10 +32,12 @@ public class EuclidianHashFamily implements HashFamily {
 	private static final long serialVersionUID = 3406464542795652263L;
 	private final int dimensions;
 	private int w;
+	private long mod;
 		
-	public EuclidianHashFamily(int w,int dimensions){
+	public EuclidianHashFamily(int w, int dimensions, long mod){
 		this.dimensions = dimensions;
-		this.w=w;
+		this.w = w;
+		this.mod = mod;
 	}
 	
 	@Override
@@ -44,12 +46,22 @@ public class EuclidianHashFamily implements HashFamily {
 	}
 	
 	@Override
-	public Integer combine(int[] hashes){
-		return Arrays.hashCode(hashes);
+	public Long combine(int[] hashes){
+		return hashCode(hashes);
 	}
 
 	@Override
 	public DistanceMeasure createDistanceMeasure() {
 		return new EuclideanDistance();
 	}
+	
+	 public long hashCode(int a[]) {
+		 this.mod = Integer.MAX_VALUE;
+		 if (a == null)
+	         return 0;
+	     long result = 1;
+	     for (int element : a)
+	         result = 31 * result + element;
+	     return (result % this.mod);
+	 }
 }

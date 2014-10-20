@@ -7,6 +7,7 @@ public class Messager {
 	public static String INSERTION_FAIL = "500: insersion failure";
 	public static String SEARCH_FAIL = "400: search failure";
 	public static String SCAN_FAIL = "400: scan failure";
+	public static String LSH_FAIL = "400: lsh failure";
 	public static String SET_LOCATOR_FAIL = "500: set server locators failure";
 	public static String CHANGE_INDEX_FAIL = "500: change index file failure";
 	public static String CLOSE_INDEX_FAIL = "500: close index writer failure";

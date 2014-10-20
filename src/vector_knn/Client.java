@@ -11,6 +11,7 @@ import java.util.Random;
 import jclient.JClient;
 import jmaster.FunctionHandler;
 import tool.DataProcessor;
+import lsh.LshManager;
 import lucene.Index;
 import lucene.QueryConfig;
 import lucene.ReturnValue;
@@ -31,7 +32,8 @@ public class Client {
 	private static int vec_num;
 	private static int nodes_num;
 	private static String vec_index = "Index"+vec_num;
-	private static String vec_scanfile = "Subfile"+vec_num;
+	private static String vec_scanfile = "Scanfile"+vec_num;
+	private static String vec_lshindex = "LSHfile"+vec_num;
 	
 	Client(String ip) throws Throwable {
 		
@@ -142,7 +144,7 @@ public class Client {
 			long starttime, endtime;
 			System.out.println("searching...");
 			starttime = System.currentTimeMillis();
-			long index[] = jclient.answerQuery(config);
+			long[] index = jclient.answerQuery(config);
 			endtime = System.currentTimeMillis();
 			avergetime += (endtime - starttime);
 			
@@ -367,29 +369,89 @@ public class Client {
 		return dis;
 	}
 	
+	public void lshIndex(String dataFile, String index_file) throws Throwable{
+		long start = System.currentTimeMillis();
+		LshManager lshManager = new LshManager(jclient);
+		lshManager.configure(5, 4, 10, 300);
+		lshManager.setDataset(dataFile);
+		lshManager.setIndexFile(index_file);
+		lshManager.lshDistributeIndex();
+		long end = System.currentTimeMillis();
+		System.out.println("LSH index total time: "+(end-start));
+	}
 	
+	public void lshQuery(String queryFile, String index_file) throws Throwable {
+		
+		long start = System.currentTimeMillis();
+		LshManager lshManager = new LshManager(jclient);
+		lshManager.configure(5, 4, 10, 300);
+		lshManager.setQuerys(queryFile);
+		lshManager.setIndexFile(index_file);
+		lshManager.startDistributeLSH();
+		long end = System.currentTimeMillis();
+		System.out.println("LSH query total time: "+(end-start));
+	}
+	
+	public void printQuery(int num) throws Throwable{
+		BufferedReader buf = new BufferedReader(new InputStreamReader(new FileInputStream("data/query.txt")));
+		String line = buf.readLine();
+		String values[] = line.split(" ");
+		int[] query = new int[values.length];
+		for(int i = 0 ; i < values.length - 1; i++) {
+			query[i] = Integer.valueOf(values[i]);
+		}
+		Reader reader = new Reader("data/datafile.bin");
+		int count = 0;
+		reader.openReader();
+
+		while(count<=8638) {
+			int vec[] = reader.getFeature(128);
+
+			if(count == 8638){
+				long distance = 0;
+				String vecStr = "";
+				String queryStr= "";
+				for(int j = 0; j < 128; j++){
+					distance += ((query[j] - vec[j]) * (query[j] - vec[j]));
+					vecStr += vec[j]+" ";
+					queryStr += query[j]+" ";
+				}
+				System.out.println(vecStr);
+				System.out.println(queryStr);
+				System.out.println(distance+" "+vec[128]);
+			}
+			count++;
+
+		}
+		
+	}
+		
 	public static void main(String args[]) throws Throwable {
 		
 		String datafile = "data/datafile.bin";
 		Client c = new Client("socket://127.0.0.1:8888");
 //		Client c = new Client("socket://137.132.145.132:8888");
-		vec_num = 250000;
-		nodes_num = 8;
+		vec_num = 100000;
+		nodes_num = 1;
 		vec_index = "Index_"+nodes_num+"_"+vec_num;
 		vec_scanfile = "Scanfile_"+nodes_num+"_"+vec_num+".bin";
+		vec_lshindex = "LSHfile_"+nodes_num+"_"+vec_num;
 //		
 //		if(args.length > 0)
 //			vec_num = Integer.valueOf(args[0]);
 		debug = false;
-//		long start = System.currentTimeMillis();
+		long start = System.currentTimeMillis();
 // 		c.buildIndex(datafile, vec_num, vec_index);
 //		c.distributeDatafile(datafile, vec_num, vec_scanfile);
+//		c.lshIndex("LSHfile_1_100000.txt", vec_lshindex);
 //		System.out.println("Building Done! Time: "+(System.currentTimeMillis() - start)+"ms");
 //		System.out.println();
 		
 //		c.testTopKsearch();
-		c.scan_topK_search();
+//		c.scan_topK_search();
 //		c.testRangeQuery();
+		c.lshQuery("data/query.txt", vec_lshindex);
+//		c.printQuery(250000);
 	}
 }
 

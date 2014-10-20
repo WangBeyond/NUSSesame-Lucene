@@ -146,7 +146,7 @@ public class ReturnValue implements Serializable{
 		if(value == null)
 			return;
 		
-		//merge the hash map
+		//intersect the hash map
 		List<Map.Entry<Long, float[]>> infoIds = 
 		    new ArrayList<Map.Entry<Long, float[]>>(this.table.entrySet());
 		for(int i = 0; i < infoIds.size(); i++) {

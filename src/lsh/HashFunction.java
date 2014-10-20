@@ -49,4 +49,8 @@ public interface HashFunction extends Serializable {
 	 *         the same hash.
 	 */
 	int hash(Vector vector);
+	
+	int getDimension();
 }
+
+

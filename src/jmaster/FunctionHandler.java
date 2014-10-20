@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.security.Policy.Parameters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -108,6 +109,9 @@ public class FunctionHandler implements ServerInvocationHandler {
 		if(parameter.function_type == Param.FUNCTION_TYPE.addPairs_long_int_Array_int) 
 			this.addPairs(parameter.param_long_elementIDs, parameter.param_int_ndims, parameter.param_int_values_id, parameter.param_int_type);
 
+		if(parameter.function_type == Param.FUNCTION_TYPE.addPairs_lshhash) 
+			this.addPairsLSH(parameter.param_long_elementIDs, parameter.param_int_ndims, parameter.param_long_combinedhashes, parameter.param_int_value_bi_length, parameter.param_int_type);
+
 		if(parameter.function_type == Param.FUNCTION_TYPE.answerQuery)
 			return this.answerQuery(parameter.qconfig);
 		
@@ -119,6 +123,9 @@ public class FunctionHandler implements ServerInvocationHandler {
 		
 		if(parameter.function_type == Param.FUNCTION_TYPE.rangeQuery)
 			return this.rangeQuery(parameter.qconfig);
+		
+		if(parameter.function_type == Param.FUNCTION_TYPE.lshQuery)
+			return this.lshQuery(parameter.qconfig);
 		
 		if(parameter.function_type == Param.FUNCTION_TYPE.getData)
 			return this.getData(parameter.param_long_elementID);
@@ -403,6 +410,11 @@ public class FunctionHandler implements ServerInvocationHandler {
 			}
 			this.pair_queues.get(Strategy.distributeTask(machines.size(), elem_id))
 				.add(new Pair(elem_id, values_long, type));
+			if(elem_id % 10 == 0){
+				for(int j = 0; j<values.size(); j++)
+					System.out.print(values.get(j));
+				System.out.println();
+			}
 		}
 		flush();
 	}
@@ -416,6 +428,7 @@ public class FunctionHandler implements ServerInvocationHandler {
 		
 		int value_index = 0, elem_dim;
 		long elem_id;
+
 		for(int i = 0; i < element_ids.size(); i++) {
 			elem_id = element_ids.get(i);
 			elem_dim = ndims.get(i);
@@ -424,11 +437,35 @@ public class FunctionHandler implements ServerInvocationHandler {
 				values_id_int[j] = values_id.get(value_index);
 				value_index++;
 			}
+
 			this.pair_queues.get(Strategy.distributeTask(machines.size(), elem_id))
 				.add(new Pair(elem_id, values_id_int, type));
 		}
 		flush();
 	}
+	
+	
+	/**
+	 * add combined hash value and write the binary file for LSH query
+	 */
+	public void addPairsLSH(List<Long> element_ids, List<Integer> ndims, List<Long> combinedhashes, int value_bilength, int type){
+		int value_index = 0, elem_dim;
+		long elem_id;
+		for(int i = 0; i < element_ids.size(); i++) {
+			elem_id = element_ids.get(i);
+			elem_dim = ndims.get(i);
+			long values_long[] = new long[elem_dim];
+			for(int j = 0; j < elem_dim; j++) {
+				values_long[j] = DataProcessor.generateKey(j, combinedhashes.get(value_index), value_bilength);
+				value_index++;
+			}
+			this.pair_queues.get(Strategy.distributeTask(machines.size(), elem_id))
+				.add(new Pair(elem_id, values_long, type));
+		}
+		flush();
+	}
+
+	
 	
 	/**
 	 * flush the data queue and call the remote function
@@ -539,7 +576,7 @@ public class FunctionHandler implements ServerInvocationHandler {
 				e.printStackTrace();
 		}
 		List<Map.Entry<Long, float[]>>list = revalue.sortedOndis();
-		for(int i = 0; i < qconfigs[0].getK(); i++)
+		for(int i = 0; i < list.size(); i++)
 			index[i] = list.get(i).getKey();
 		return index;
 	}
@@ -588,6 +625,25 @@ public class FunctionHandler implements ServerInvocationHandler {
 			index[i] = list.get(i).getKey();
 		return index;
 	}
+	
+	/**
+	 * query the knn using LSH
+	 */
+	public ReturnValue lshQuery(QueryConfig qconfigs[]) {
+
+		ReturnValue revalue = new ReturnValue();
+		try {
+			revalue = this.getReturnValueByLshNode(qconfigs);
+		} catch (Throwable e) {
+			
+			System.out.println(Messager.LSH_FAIL);
+			if(debug)
+			// TODO Auto-generated catch block
+				e.printStackTrace();
+		}
+		return revalue;
+	}
+	
 	
 	
 	/**
@@ -718,6 +774,65 @@ public class FunctionHandler implements ServerInvocationHandler {
 		return result;
 	}
 	
+	/**
+	 * Similar to the above methods but the search algorithm is LSH
+	 * */
+	private ReturnValue getReturnValueByLshNode(QueryConfig qconfigs[]) throws Throwable {
+		
+		// final result
+		ReturnValue result = new ReturnValue();
+		
+		// set sub system
+		for(int i = 0; i < machines.size(); i++)
+			machines.elementAt(i).setSubsystem("Lsh");
+		//create a thread pool for queries
+		ExecutorService executor = Executors.newFixedThreadPool(fixed_thread_num);
+		
+		List<QueryConfig> list = new ArrayList<QueryConfig>();	
+		for(int i = 0;i < qconfigs.length; i++)
+			list.add(qconfigs[i]);
+		// for vector search, we need to
+		if(qconfigs[0].getType() == Index.VECTOR_SEARCH) {
+			//sort the query configs by their dimension 
+			//O(n)
+			for(int i = 0;i < qconfigs.length; i++)
+				list.set(qconfigs[i].getDim(), qconfigs[i]);
+		}
+		Vector<Future<ReturnValue>> future_vec = new Vector<Future<ReturnValue>>();
+		int num_of_tasks = 0;
+		// submit the task to threadpool
+		for(int i = 0; i < machines.size(); i++) {
+			num_of_tasks++;
+			Future<ReturnValue> future = executor.submit(
+					new NodeTask(machines.elementAt(i), list));
+			future_vec.add(future);
+		}
+		
+		long start = System.currentTimeMillis();
+		long merge_time = 0;
+		// wait for all the tasks are done
+		int num_of_returned = 0;
+		while(num_of_returned < num_of_tasks) {
+			Thread.sleep(SLEEP_TIME);
+			for(int i = 0; i < future_vec.size(); i++) {
+				if(future_vec.elementAt(i) != null && future_vec.elementAt(i).isDone()) {
+					num_of_returned++;
+					ReturnValue revalue = future_vec.elementAt(i).get();
+					System.out.println("node "+i+" finish time "+(System.currentTimeMillis()-start)+" ms");
+					// merge the results from different nodes
+					long merge_start = System.currentTimeMillis();
+					result.merge(revalue);
+					merge_time += System.currentTimeMillis() - merge_start;
+					// clear the task
+					future_vec.setElementAt(null, i);
+				}
+			}
+		}
+		System.out.println("Merge time in function:\t"+merge_time+" ms");
+		System.out.println("Wait for return:\t"+(System.currentTimeMillis() - start - merge_time+" ms"));
+		executor.shutdown();
+		return result;
+	}
 	
 	/**
 	 * get the data using the index
@@ -906,7 +1021,7 @@ class InitTask implements Callable<Integer>{
 		param[0] = type;
 		//the other is the number of the slave nodes which is used for mapping
 		param[1] = nodeNum;
-		
+		System.out.println("init "+type);
 	}
 	
 	@Override

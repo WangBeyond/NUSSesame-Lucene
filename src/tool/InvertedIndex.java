@@ -11,7 +11,7 @@ import java.util.ArrayList;
  */
 public class InvertedIndex {
 
-	public static boolean debug = true;
+	public static boolean debug = false;
 	
     public ArrayList<ArrayList<Integer>> invertedIndex;
 
@@ -277,6 +277,68 @@ public class InvertedIndex {
         }
     }
 
+    public int readBinaryAndWriteText(String readFile, String writeFile, int maxNumberOfFeatures) throws IOException
+    {
+        int count = 0;
+
+        DataInputStream in = new DataInputStream(new
+                BufferedInputStream(new FileInputStream(new File(readFile))));
+        FileWriter out = new FileWriter( new File(writeFile) );
+
+            while (true)
+            {
+                try {
+
+                // read int for id
+            	int featureIDBinary = in.readInt();
+                int featureID = EndianUtils.swapInteger( featureIDBinary );
+
+
+                
+                if (!debug && featureID % 10000 == 1 )
+                {
+                    System.out.println("processing " + featureID );
+                } else if (debug)
+                {
+                    System.out.println("processing " + featureID );
+                }
+
+                if ( featureID >= maxNumberOfFeatures )
+                {
+                    break;
+                }
+                out.write(featureID+" ");
+
+                // System.out.println("featureID:" + featureID);
+                for ( int dim = 0; dim < NUMBER_OF_DIMENSIONS; dim++ )
+                { 
+                    int value = EndianUtils.swapInteger( in.readInt() );
+                   out.write(value+" ");
+                   if(featureID == 8638){
+                   		System.out.print(value+" ");
+                   }
+                }
+                out.write("\n");
+                
+                //System.out.println();
+                count ++;
+                }
+                catch (EOFException e)
+                {
+                    // end of the file
+                    in.close();
+                    out.close();
+                    return count;
+                }
+            }
+            in.close();
+            out.close();
+            return count;
+        
+
+    }
+    
+    
     /**
      * write the inverted index to the dataFile
      *
@@ -428,7 +490,7 @@ public class InvertedIndex {
     }
 
 
-    public static void main ( String[] args ) throws IOException
+    public static void main ( String[] args )
     {
         if ( args.length < 2 )
         {
@@ -442,20 +504,24 @@ public class InvertedIndex {
         
         
         
-//        readFile = "data/datafile2.bin";
-
+        readFile = "data/datafile.bin";
+        writeFile ="LSHfile_1_100000.txt";
         // read binary files
         InvertedIndex invertedIndex = new InvertedIndex();
-//        invertedIndex.readAndWrite(readFile, writeFile, 250000);
+        try{
+        	invertedIndex.readBinaryAndWriteText(readFile, writeFile, 100000);
+        }catch(Exception e){
+        	e.printStackTrace();
+        }
 
 //        invertedIndex.readAFeature( readFile, 101 );
 
 
-        int numberOfFeatures = invertedIndex.addFeaturesOfBinaryFile( new File( writeFile ),50000 );
+//        int numberOfFeatures = invertedIndex.addFeaturesOfBinaryFile( new File( readFile ),100000 );
 
-        System.out.println("# of features: " + numberOfFeatures);
+//        System.out.println("# of features: " + numberOfFeatures);
         
-        invertedIndex.writeTextFile(new File("data/datafile.txt"));
+//        invertedIndex.writeTextFile(new File("LSHfile_1_100000.txt"));
 
         // write the inverted files in binary format
         //invertedIndex.writeBinaryFile( new File("data/datafile2.bin"));

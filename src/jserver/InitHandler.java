@@ -31,7 +31,9 @@ public class InitHandler implements ServerInvocationHandler{
 		param = (int[]) arg0.getParameter();
 		int type = param[0], num_nodes = param[1];
 		
-		if(type == Index.VECTOR_BUILD || type == Index.STRING_BUILD) {
+		System.out.println("init2 "+type);
+		
+		if(type == Index.VECTOR_BUILD || type == Index.STRING_BUILD || type==Index.LSH_BUILD) {
 			index.init_building();
 		} else if(type == Index.STRING_SEARCH){
 			index.init_query();
@@ -43,7 +45,10 @@ public class InitHandler implements ServerInvocationHandler{
 			index.init_scan();
 		} else if(type == Index.RANGE_QUERY) {
 			index.init_query();		
-		}else {
+		} else if(type == Index.LSH_QUERY) {
+			System.out.println("init lsh");
+			index.init_query();
+		} else {
 			System.out.println("Initialization error: invalid invocation type");
 		}
 		return 1;

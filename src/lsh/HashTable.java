@@ -44,7 +44,7 @@ class HashTable implements Serializable {
 	 * Contains the mapping between a combination of a number of hashes (encoded
 	 * using an integer) and a list of possible nearest neighbours
 	 */
-	private HashMap<Integer,List<Vector>> hashTable;
+	private HashMap<Long,List<Vector>> hashTable;
 	private HashFunction[] hashFunctions;
 	private HashFamily family;
 	
@@ -59,7 +59,7 @@ class HashTable implements Serializable {
 	 *            functions, and is used therefore.
 	 */
 	public HashTable(int numberOfHashes,HashFamily family){
-		hashTable = new HashMap<Integer, List<Vector>>();
+		hashTable = new HashMap<Long, List<Vector>>();
 		this.hashFunctions = new HashFunction[numberOfHashes];
 		for(int i=0;i<numberOfHashes;i++){
 			hashFunctions[i] = family.createHashFunction();
@@ -79,7 +79,7 @@ class HashTable implements Serializable {
 	 *         list of candidates is returned.
 	 */
 	public List<Vector> query(Vector query) {
-		Integer combinedHash = hash(query);
+		Long combinedHash = hash(query);
 		if(hashTable.containsKey(combinedHash))
 			return hashTable.get(combinedHash);
 		else
@@ -90,12 +90,13 @@ class HashTable implements Serializable {
 	 * Add a vector to the index.
 	 * @param vector
 	 */
-	public void add(Vector vector) {
-		Integer combinedHash = hash(vector);
+	public Long add(Vector vector) {
+		Long combinedHash = hash(vector);
 		if(! hashTable.containsKey(combinedHash)){
 			hashTable.put(combinedHash, new ArrayList<Vector>());
 		}
 		hashTable.get(combinedHash).add(vector);
+		return combinedHash;
 	}
 	
 	/**
@@ -103,12 +104,12 @@ class HashTable implements Serializable {
 	 * @param vector The vector to calculate the combined hash for.
 	 * @return An integer representing a combined hash.
 	 */
-	private Integer hash(Vector vector){
+	private Long hash(Vector vector){
 		int hashes[] = new int[hashFunctions.length];
 		for(int i = 0 ; i < hashFunctions.length ; i++){
 			hashes[i] = hashFunctions[i].hash(vector);
 		}
-		Integer combinedHash = family.combine(hashes);
+		Long combinedHash = family.combine(hashes);
 		return combinedHash;
 	}
 
@@ -118,5 +119,9 @@ class HashTable implements Serializable {
 	 */
 	public int getNumberOfHashes() {
 		return hashFunctions.length;
+	}
+	
+	public HashFunction getHashFunction(int index){
+		return hashFunctions[index];
 	}
 }
