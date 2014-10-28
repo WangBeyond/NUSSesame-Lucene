@@ -47,6 +47,8 @@ public class EuclidianHashFamily implements HashFamily {
 	
 	@Override
 	public Long combine(int[] hashes){
+//		System.out.println(Arrays.hashCode(hashes)+" "+(long)Arrays.hashCode(hashes));
+//		return (long)Arrays.hashCode(hashes);
 		return hashCode(hashes);
 	}
 
@@ -56,12 +58,15 @@ public class EuclidianHashFamily implements HashFamily {
 	}
 	
 	 public long hashCode(int a[]) {
+//		 long result = Arrays.hashCode(a);
+//		 return result;
 		 this.mod = Integer.MAX_VALUE;
 		 if (a == null)
 	         return 0;
-	     long result = 1;
+	     long result = 0;
+	     
 	     for (int element : a)
-	         result = 31 * result + element;
-	     return (result % this.mod);
+	         result = 2 * result + element;
+	     return Math.abs(result % this.mod);
 	 }
 }

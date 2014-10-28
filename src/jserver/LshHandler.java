@@ -35,7 +35,7 @@ public class LshHandler implements ServerInvocationHandler {
 		// TODO Auto-generated method stub	
 		@SuppressWarnings("unchecked")
 		List<QueryConfig> qlist = (List<QueryConfig>) arg.getParameter();
-		return this.index.lshSearch(qlist);
+		return null;
 	}
 
 	@Override

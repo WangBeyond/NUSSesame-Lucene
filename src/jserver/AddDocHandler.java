@@ -47,7 +47,7 @@ public class AddDocHandler implements ServerInvocationHandler {
 		Pair pair;
 		for(int i = 0; i < list.size(); i++) {
 			pair = list.get(i);
-			if(pair.getType() == Index.VECTOR_BUILD || pair.getType() == Index.LSH_BUILD) {
+			if(pair.getType() == Index.VECTOR_BUILD ) {
 				index.addDoc(pair.id_long, pair.values_long);
 			} else if(pair.getType() == Index.STRING_BUILD) {
 				index.addDoc(pair.id_long, pair.value_string);

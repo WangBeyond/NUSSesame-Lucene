@@ -24,6 +24,7 @@
 package lsh;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -82,11 +83,16 @@ public class LSH {
 			}
 			for(Vector vector : dataset){
 				boolean isPrint = false;
-				if(count%10000==0){
-					isPrint = false;
-					System.out.println(count);
-				}
+
 				List<Long> combineValues = index.index(vector, isPrint);
+				
+				if(vector.getKey() == 10000 || vector.getKey()==17015 || vector.getKey() == 91891){
+					isPrint = false;
+					System.out.println(vector.getKey()+" "+count+" "+vector);
+					for(Long value: combineValues)
+						System.out.print(value+" ");
+					System.out.println();
+				}
 				
 				combineValueCollection.add(combineValues);
 				
@@ -193,6 +199,10 @@ public class LSH {
 		return index.query(query,neighboursSize);
 	}
 
+	public List<Vector> sortCandidates(final Vector query, List<Vector> candidates, int neighboursSize){
+		return index.sortCandidates(query, candidates, neighboursSize);
+	}
+	
 	/**
 	 * Search for the actual nearest neighbours for a query vector using an
 	 * exhaustive linear search. For each vector a priority queue is created,

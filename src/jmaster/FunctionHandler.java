@@ -410,11 +410,6 @@ public class FunctionHandler implements ServerInvocationHandler {
 			}
 			this.pair_queues.get(Strategy.distributeTask(machines.size(), elem_id))
 				.add(new Pair(elem_id, values_long, type));
-			if(elem_id % 10 == 0){
-				for(int j = 0; j<values.size(); j++)
-					System.out.print(values.get(j));
-				System.out.println();
-			}
 		}
 		flush();
 	}
@@ -563,7 +558,7 @@ public class FunctionHandler implements ServerInvocationHandler {
 	 * */
 	public long[] answerQuery(QueryConfig qconfigs[]) {
 		
-		long[] index = new long[qconfigs[0].getK()];
+//		long[] index = new long[qconfigs[0].getK()];
 //		Candidates candidates = null;
 		ReturnValue revalue = new ReturnValue();
 		try {
@@ -576,8 +571,11 @@ public class FunctionHandler implements ServerInvocationHandler {
 				e.printStackTrace();
 		}
 		List<Map.Entry<Long, float[]>>list = revalue.sortedOndis();
-		for(int i = 0; i < list.size(); i++)
+		long[] index = new long[list.size()];
+		System.out.println(list.size());
+		for(int i = 0; i < list.size(); i++){
 			index[i] = list.get(i).getKey();
+		}
 		return index;
 	}
 	

@@ -161,8 +161,19 @@ public class Index implements Serializable{
 			List<Vector> v = table.query(query);
 			candidateSet.addAll(v);
 		}
-		List<Vector>candidates = new ArrayList<Vector>(candidateSet);
+		List<Vector> candidates = new ArrayList<Vector>(candidateSet);
+		System.out.println("size " +candidates.size());
 		evaluated += candidates.size();
+		DistanceMeasure measure = family.createDistanceMeasure();
+		DistanceComparator dc = new DistanceComparator(query, measure);
+		Collections.sort(candidates,dc);
+		if(candidates.size() > maxSize){
+			candidates = candidates.subList(0, maxSize);
+		}
+		return candidates;
+	}
+	
+	public List<Vector> sortCandidates(final Vector query, List<Vector> candidates, int maxSize){
 		DistanceMeasure measure = family.createDistanceMeasure();
 		DistanceComparator dc = new DistanceComparator(query, measure);
 		Collections.sort(candidates,dc);

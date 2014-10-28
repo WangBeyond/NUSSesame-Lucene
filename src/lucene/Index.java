@@ -71,7 +71,7 @@ import tool.VectorListProto.VectorList;
  * */
 public class Index {
 	// for debug
-	static boolean debug = false;
+	static boolean debug = true;
 	// for testing
 	static boolean test = true;
 	static long init_time = 0;
@@ -205,6 +205,9 @@ public class Index {
 		id_field.setLongValue(id);
 		value_field.setStringValue(strbuf.toString());
 		data_field.setStringValue("ID|" + id);
+		if(debug && id%10000==0){
+			System.out.println("add "+id+" "+strbuf.toString());
+		}
 		long start2 = System.currentTimeMillis();
 		doc.add(id_field);
 		doc.add(value_field);
@@ -304,6 +307,7 @@ public class Index {
 	 * initialize the query process
 	 * */
 	public void init_query() throws Throwable {
+		System.out.println("init query");
 		if (indexReader != null)
 			indexReader.close();
 		if (areader != null)
@@ -376,6 +380,7 @@ public class Index {
 		if (test) {
 			Index.num_query++;
 			start = System.currentTimeMillis();
+			System.out.println("query config: "+config.getQuerylong());
 		}
 		// start search
 		ReturnValue revalue;
@@ -410,10 +415,11 @@ public class Index {
 	 * To lower the remote function calling cost, the salve node handle a batch
 	 * of every time
 	 * */
-	public ReturnValue generalSearch(List<QueryConfig> qlist) throws Throwable {
+	public ReturnValue ggeneralSearch(List<QueryConfig> qlist) throws Throwable {
 		ReturnValue result = new ReturnValue();
 		ReturnValue revalue = new ReturnValue();
 		K = qlist.get(0).getK();
+		System.out.println("general search");
 		// if we search the vector
 		if (qlist.get(0).getType() == QueryConfig.VECTOR) {
 			// set searching configuration
@@ -432,6 +438,7 @@ public class Index {
 				// than the minimum lower bound of rest (n-k) elements
 				if (candidates.elements_min_upperbound[0].upper_bound <= candidates.elements_min_lowerbound[0].lower_bound)
 					break;
+
 			}
 			long index[] = new long[K];
 			// record the K nearest neighbors
@@ -441,13 +448,16 @@ public class Index {
 				}
 			}
 			float dis[] = getDistances(index, qlist);
+			int count = 0;
 			for (int i = 0; i < dis.length; i++) {
 				float count_dis[] = new float[2];
 				count_dis[0] = 128;
 				count_dis[1] = dis[i];
 				System.out.println(index[i] + "\t" + dis[i]);
 				result.table.put(index[i], count_dis);
+				count++;
 			}
+			System.out.println(count);
 		}
 		// if we search for string, it is simpler. we do not have to iterate
 		else if (qlist.get(0).getType() == QueryConfig.STRING) {
@@ -467,6 +477,26 @@ public class Index {
 		return result;
 	}
 
+	/**
+	 * To lower the remote function calling cost, the salve node handle a batch
+	 * of every time
+	 * */
+	public ReturnValue generalSearch(List<QueryConfig> qlist) throws Throwable {
+		ReturnValue result = new ReturnValue();
+		ReturnValue revalue = new ReturnValue();
+		K = qlist.get(0).getK();
+		// if we search the vector
+		// set searching configuration
+		NUM_COMBINATION = qlist.get(0).num_combination;
+		DIM_RANGE = qlist.get(0).getDimRange();
+
+		for (int i = 0; i < qlist.size(); i++) {
+			revalue.merge((generalSearch(qlist.get(i))));
+		}
+		
+	return revalue;
+	}
+	
 	/**
 	 * rangeSearch is similar to vector search in generalSearch but it only
 	 * conducts the first iteration
@@ -615,15 +645,21 @@ public class Index {
 	private float[] getDistances(long ids[], List<QueryConfig> qlist) {
 		float distances[] = new float[ids.length];
 		String values[];
-		int actual_value;
+		long actual_value;
 		for (int i = 0; i < ids.length; i++) {
+			if(ids[i]==10000 || ids[i]==37821 || ids[i]==41137)
+				System.out.println("value "+ids[i]+" "+this.getData(ids[i]));
 			values = this.getData(ids[i]).split(" ");
 			for (int j = 0; j < values.length; j++) {
 				// extract the actual value from the number (dim%256+value)
 				if (j == 0)
-					actual_value = Integer.valueOf(values[j]);
+					actual_value = Long.valueOf(values[j]);
 				else
-					actual_value = Integer.valueOf(values[j]) % (j << 8);
+					actual_value = Long.valueOf(values[j]) % (long)Math.pow(2,32);
+
+//					actual_value = Long.valueOf(values[j]) % (j << 8);
+				if(ids[i]==17015 )
+					System.out.println(j+" "+actual_value+" "+values[j]+" "+qlist.get(j).getDimValue());
 				distances[i] += qlist.get(j).calcDistance(
 						qlist.get(j).getDimValue(), actual_value);
 			}
@@ -758,6 +794,7 @@ public class Index {
 			start_time = System.currentTimeMillis();
 		BytesRef buf = new BytesRef();
 		long doc_id;
+		int count = 0;
 		while ((lucene_doc_id = enumer.nextDoc()) != DocsAndPositionsEnum.NO_MORE_DOCS) {
 			doc_id = idmap[lucene_doc_id];
 			float count_dis[] = new float[2];
@@ -765,7 +802,12 @@ public class Index {
 			count_dis[0] = 1;
 			count_dis[1] = distance;
 			revalue.table.put(doc_id, count_dis);
+			count++;
+			if(doc_id==17015 || doc_id==91891)
+				System.out.println(doc_id+" "+config.getDimValue());
 		}
+		System.out.println("revalue"+config.getDimValue()+" "+count);
+
 		if (test)
 			Index.scanning_value_list_time += (System.currentTimeMillis() - start_time);
 	}
@@ -783,6 +825,7 @@ public class Index {
 				+ config.getQuerylong();
 		// to store the keys of last scan
 		long[] keys = new long[2];
+		System.out.println("dim "+config.getDim()+" "+config.getUpRange()+" "+config.getDownRange());
 		// continue scanning from last position
 		// find the start position
 		if (bi_position_map.containsKey(id_query)) {

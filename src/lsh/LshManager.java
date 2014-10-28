@@ -15,6 +15,8 @@ import lucene.Index;
 
 
 public class LshManager {
+	private boolean test = true;
+	
 	private static int COMBINE_DIM = 128;	
 	private static boolean GENERATE_PROJECTION = true;
 	private static boolean READ_PROJECTION = false;
@@ -63,8 +65,12 @@ public class LshManager {
 //	
 	public void setDataset(String dataFile) {
 		if(dataFile !=null){
+			long startTime = System.currentTimeMillis();
 			dataset = LSH.readDataset(dataFile,Integer.MAX_VALUE);
 			dimensions = dataset.get(0).getDimensions();
+			long endTime = System.currentTimeMillis();
+			if(test)
+				System.out.println("read dataset time: "+(endTime - startTime)+" ms");
 		}
 	}
 	
@@ -115,7 +121,7 @@ public class LshManager {
 		jclient.initAllServers(Index.VECTOR_BUILD, index_file);
 		//set the buffer size
 		jclient.setMaxVecNum(5000);
-		
+		System.out.println("Begin remotely indexing");
 		//num_elements indicate the number of the data set
 		for (int i = 0; i < this.dataset.size(); i++) {
 			Vector vector = dataset.get(i);
@@ -142,25 +148,26 @@ public class LshManager {
 	}
 
 	public ReturnValue startDistributeLSH()throws Throwable{
+		long startTime = System.currentTimeMillis();
 		ReturnValue revalue = new ReturnValue();
 		family = getHashFamily(radius, "l2", dimensions);
-		LSH lsh = new LSH(new ArrayList<Vector>(), family, GENERATE_PROJECTION);
-		lsh.buildIndex(numberOfHashes,numberOfHashTables);	
+		LSH lsh = new LSH(null, family, GENERATE_PROJECTION);
+		lsh.buildIndex(numberOfHashes,numberOfHashTables);
+		long endTime = System.currentTimeMillis();
+		if(test)
+			System.out.println("configure query time: "+(endTime - startTime)+" ms");
 		if(queries != null){
-			jclient.connectAllServers(this.index_file);
 			System.out.println("query...");
 			for(int i = 0; i < queries.size(); i++){
 				Vector query = queries.get(i);
-				List<Long> combineValues = lsh.index(query);
-				lshSearch(i, combineValues);
-				System.out.println(query.getKey());
-				System.out.print("\n");
+				List<Long> combineHashes = lsh.index(query);
+				lshSearch(i, combineHashes, query, lsh);
 			}
 		}
 		return revalue;
 	}
 	
-	public void lshSearch(int qid, List<Long> combineValues) throws Throwable{
+	public void lshSearch(int qid, List<Long> combineValues, Vector query, LSH lsh) throws Throwable{
 		
 		COMBINE_DIM = 1;
 		int K = 100;
@@ -168,17 +175,20 @@ public class LshManager {
 		jclient.connectAllServers(index_file);
 
 		//create the QueryConfig for each dimension
+		jclient.initAllServers(Index.VECTOR_BUILD, index_file);
 
 		qid++;
 		//maximum number of range and value
 		int dim_range= this.numberOfHashTables;
-		long value_range = (long)Integer.MAX_VALUE;
+		long value_range = 2*(long)Integer.MAX_VALUE;
 		SIFTConfig config[] = new SIFTConfig[dim_range];
 		long[] combine_values = new long[dim_range];
-		for(int j = 0; j < COMBINE_DIM; j++) {
+		for(int j = 0; j < dim_range; j++) {
 			combine_values[j] = combineValues.get(j);
 		}
 		for(int i = 0; i < dim_range; i++) {
+			int[] combine_values_int = new int[1];
+			combine_values_int[0] = (int)combine_values[i];
 			//initialize a query configuration, set query id
 			config[i] = new SIFTConfig(qid);
 			//set the domain
@@ -186,7 +196,7 @@ public class LshManager {
 
 			config[i].num_combination = COMBINE_DIM;
 			//set query 
-			config[i].setQuerylong((long)(i*Math.pow(2,32))+combine_values[i]);
+			config[i].setQuerylong(i, combine_values_int);
 			config[i].setDim(i);
 			
 			//set bi-direction search range
@@ -201,20 +211,35 @@ public class LshManager {
 		long starttime, endtime;
 		System.out.println("searching...");
 		starttime = System.currentTimeMillis();
-		long[] index = jclient.answerQuery(config);
-		endtime = System.currentTimeMillis();
+		long[] indices = jclient.answerQuery(config);
+		
+//		for(long index : indices){
+//			Vector vector = this.dataset.get(index);
+//			
+//		}
 		
 		//display the results
-		for(int i = 0; i < index.length; i++) {
-			System.out.println(index[i]);
+		List<Vector> candidates = new ArrayList<Vector>();
+		for(int i = 0; i < indices.length; i++) {
+			Vector candidate = this.dataset.get((int)indices[i]);
+			candidates.add(candidate);
 		}
+		
+		List<Vector> results = lsh.sortCandidates(query, candidates, this.numberOfNeighbours);
+		endtime = System.currentTimeMillis();
+		
+		System.out.println("Results");
+		for(int i = 0; i < results.size(); i++){
+			System.out.println(results.get(i).getKey());
+		}
+		
 		System.out.println("seraching time: "+(endtime - starttime)+" ms");
 	}
 	
 	public ReturnValue startLocalLSH(){
 		ReturnValue revalue = new ReturnValue();
 		family = getHashFamily(radius, "l2", dimensions);
-		LSH lsh = new LSH(new ArrayList<Vector>(), family, GENERATE_PROJECTION);
+		LSH lsh = new LSH(null, family, GENERATE_PROJECTION);
 		lsh.buildIndex(numberOfHashes,numberOfHashTables);	
 		if(queries != null){
 			for(Vector query:queries){
@@ -223,8 +248,9 @@ public class LshManager {
 					double value = query.get(i);
 					System.out.print(Math.round(value)+" ");
 				}
+				System.out.println();
 				List<Vector> neighbours = lsh.query(query, numberOfNeighbours);
-				System.out.println(query.getKey());
+				System.out.println(query.getKey()+" "+neighbours.size());
 				for(Vector neighbour:neighbours){
 					float count_dis[] = new float[2];
 					count_dis[0] = 128;
@@ -250,12 +276,12 @@ public class LshManager {
 		
 		try{
 			long start = System.currentTimeMillis();
-			int numberOfHashTables = 5;
-			int numberOfHashes = 4;
+			int numberOfHashTables = 8;
+			int numberOfHashes = 8;
 			int numberOfNeighbours = 10;
 			double radius = 400;
 			LshManager lshManager = new LshManager();
-			lshManager.configure(10, 8, 10, 300);
+			lshManager.configure(6, 14, 10, 120);
 			lshManager.setDataset("LSHfile_1_100000.txt");
 			lshManager.setQuerys("data/query.txt");
 			lshManager.lshLocalIndex();

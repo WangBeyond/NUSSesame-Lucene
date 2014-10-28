@@ -372,7 +372,7 @@ public class Client {
 	public void lshIndex(String dataFile, String index_file) throws Throwable{
 		long start = System.currentTimeMillis();
 		LshManager lshManager = new LshManager(jclient);
-		lshManager.configure(5, 4, 10, 300);
+		lshManager.configure(6, 14, 10, 120);
 		lshManager.setDataset(dataFile);
 		lshManager.setIndexFile(index_file);
 		lshManager.lshDistributeIndex();
@@ -380,12 +380,13 @@ public class Client {
 		System.out.println("LSH index total time: "+(end-start));
 	}
 	
-	public void lshQuery(String queryFile, String index_file) throws Throwable {
+	public void lshQuery(String queryFile, String dataFile, String index_file) throws Throwable {
 		
 		long start = System.currentTimeMillis();
 		LshManager lshManager = new LshManager(jclient);
-		lshManager.configure(5, 4, 10, 300);
+		lshManager.configure(6, 14, 10, 120);
 		lshManager.setQuerys(queryFile);
+		lshManager.setDataset(dataFile);
 		lshManager.setIndexFile(index_file);
 		lshManager.startDistributeLSH();
 		long end = System.currentTimeMillis();
@@ -450,7 +451,7 @@ public class Client {
 //		c.testTopKsearch();
 //		c.scan_topK_search();
 //		c.testRangeQuery();
-		c.lshQuery("data/query.txt", vec_lshindex);
+		c.lshQuery("data/query.txt", "LSHfile_1_100000.txt", vec_lshindex);
 //		c.printQuery(250000);
 	}
 }
