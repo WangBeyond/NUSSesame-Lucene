@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
+import tool.SQLManager;
 import vector_knn.SIFTConfig;
 
 import jclient.JClient;
@@ -39,13 +40,19 @@ public class LshManager {
 	private boolean printHelp;
 	
 	private JClient jclient;
+	SQLManager sqlManager;
 
 	
 	public LshManager(JClient jclient ) throws Throwable{
+		long start = System.currentTimeMillis();
 		this.jclient = jclient;
+		sqlManager = new SQLManager();
+		long end = System.currentTimeMillis();
+		System.out.println("time for initialize LSH manager\t"+(end - start));
 	}
 	
 	public LshManager() throws Throwable{
+		sqlManager = new SQLManager();
 	}
 	
 	public void configure(int numberOfHashTables, int numberOfHashes, int numberOfNeighbours, int radius){
@@ -219,12 +226,7 @@ public class LshManager {
 //		}
 		
 		//display the results
-		List<Vector> candidates = new ArrayList<Vector>();
-		for(int i = 0; i < indices.length; i++) {
-			Vector candidate = this.dataset.get((int)indices[i]);
-			candidates.add(candidate);
-		}
-		
+		List<Vector> candidates = this.sqlManager.selectData(indices);
 		List<Vector> results = lsh.sortCandidates(query, candidates, this.numberOfNeighbours);
 		endtime = System.currentTimeMillis();
 		
@@ -281,7 +283,7 @@ public class LshManager {
 			int numberOfNeighbours = 10;
 			double radius = 400;
 			LshManager lshManager = new LshManager();
-			lshManager.configure(6, 14, 10, 120);
+			lshManager.configure(6, 12, 10, 120);
 			lshManager.setDataset("LSHfile_1_100000.txt");
 			lshManager.setQuerys("data/query.txt");
 			lshManager.lshLocalIndex();

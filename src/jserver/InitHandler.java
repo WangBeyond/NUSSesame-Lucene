@@ -37,7 +37,7 @@ public class InitHandler implements ServerInvocationHandler{
 			index.init_building();
 		} else if(type == Index.STRING_SEARCH){
 			index.init_query();
-		} else if(type == Index.VECTOR_SEARCH) {
+		} else if(type == Index.VECTOR_SEARCH || type == Index.LSH_QUERY) {
 			index.init_query();
 		} else if(type == Index.SCAN_BUILD) {
 			index.init_binwriter();

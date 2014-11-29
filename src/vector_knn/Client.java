@@ -386,11 +386,10 @@ public class Client {
 		LshManager lshManager = new LshManager(jclient);
 		lshManager.configure(6, 14, 10, 120);
 		lshManager.setQuerys(queryFile);
-		lshManager.setDataset(dataFile);
 		lshManager.setIndexFile(index_file);
 		lshManager.startDistributeLSH();
 		long end = System.currentTimeMillis();
-		System.out.println("LSH query total time: "+(end-start));
+		System.out.println("LSH query total time: "+(end-start)+ "ms");
 	}
 	
 	public void printQuery(int num) throws Throwable{

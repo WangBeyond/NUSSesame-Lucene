@@ -19,7 +19,7 @@ public class SSHManager
 	    Logger.getLogger(SSHManager.class.getName());
 	private JSch jschSSHChannel;
 	private String strUserName;
-	private String strConnectionIP;
+	public String strConnectionIP;
 	private int intConnectionPort;
 	private String strPassword;
 	private Session sesConnection;
@@ -209,11 +209,11 @@ public class SSHManager
 		      * PASSWORD: PASSWORD FOR THAT USER
 		      * HOST: IP ADDRESS OF THE SSH SERVER
 		     **/
-		     String command = "rm /home/maindisk/Test/Test4.17/Server4.40.jar";
+		     String command = "rm /home/maindisk/Test/Test4.17/Server4.80.jar";
 		     String userName = "root";
 		     String password = "root";
 		     String connectionIP = "192.168.1.11";
-		     String fileDir = "Built Jars/Server4.40.jar";
+		     String fileDir = "Built Jars/Server4.80.jar";
 		     String sftpDir = "/home/maindisk/Test/Test4.17/";
 		     SSHManager instance = new SSHManager(userName, password, connectionIP, "");
 		     String errorMessage = instance.connect();

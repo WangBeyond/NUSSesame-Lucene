@@ -95,6 +95,8 @@ public class Index {
 	public static int VECTOR_SCAN = 5;
 	public static int SCAN_BUILD = 6;
 	public static int RANGE_QUERY = 7;
+	public static int LSH_QUERY = 8;
+	
 	// used in previous version, @deprecated now
 	public static int BUILD = STRING_BUILD;
 	private File indexFile;
@@ -415,7 +417,7 @@ public class Index {
 	 * To lower the remote function calling cost, the salve node handle a batch
 	 * of every time
 	 * */
-	public ReturnValue ggeneralSearch(List<QueryConfig> qlist) throws Throwable {
+	public ReturnValue generalSearch(List<QueryConfig> qlist) throws Throwable {
 		ReturnValue result = new ReturnValue();
 		ReturnValue revalue = new ReturnValue();
 		K = qlist.get(0).getK();
@@ -481,7 +483,7 @@ public class Index {
 	 * To lower the remote function calling cost, the salve node handle a batch
 	 * of every time
 	 * */
-	public ReturnValue generalSearch(List<QueryConfig> qlist) throws Throwable {
+	public ReturnValue lshSearch(List<QueryConfig> qlist) throws Throwable {
 		ReturnValue result = new ReturnValue();
 		ReturnValue revalue = new ReturnValue();
 		K = qlist.get(0).getK();

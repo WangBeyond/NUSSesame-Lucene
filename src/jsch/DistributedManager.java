@@ -1,6 +1,7 @@
 package jsch;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -74,6 +75,12 @@ public class DistributedManager {
 	public void sendFilesToAllServers(String jarFileName) {
 	     String fileDir = "Built Jars/"+jarFileName;
 	     String sftpDir = "/home/maindisk/Test/Test4.17/";
+	     
+		File file = new File(fileDir);
+		if(!file.exists()) {
+			System.out.println("File not exists");
+			return;
+		}
 	     sendFilesToAllServers(fileDir, sftpDir);
 	}
 	
@@ -83,6 +90,7 @@ public class DistributedManager {
 		     try {
 		    	 sshManager.sendFile(fileDir, sftpDir);
 		     } catch (Throwable e) {
+		    	 System.out.println("Error with node "+sshManager.strConnectionIP);
 		    	 e.printStackTrace();
 		     }
 			}
@@ -114,7 +122,7 @@ public class DistributedManager {
 	}
 	
 	public static void main(String[] args){
-		String jarFileName = "Server4.72.jar";
+		String jarFileName = "Server4.80.jar";
 		if(args.length>0) {
 			jarFileName = args[0];
 		}
@@ -124,6 +132,7 @@ public class DistributedManager {
 		DistributedManager manager = new DistributedManager();
 		manager.setLocators(ipfile);
 		manager.init(username, password);
+
 		manager.connectAllServer();
 		manager.sendFilesToAllServers(jarFileName);
 		//manager.sendExecCommandToAllServers(jarFileName);
